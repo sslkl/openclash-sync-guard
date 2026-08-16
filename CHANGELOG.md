@@ -8,4 +8,5 @@
 - Added complete Digest/header parsing, root-owned directory-chain checks, single-line Ed25519 pinning, non-null double-hash backups, full runtime static-block verification, and explicit TLS Origin allowlisting.
 - Added strict topology renderer, offline verification script, CI, deployment gates, security policy, and sanitized audit report.
 - Replaced reconstructable private-marker fixtures and synthetic RFC 1918 addresses with generic checks and RFC 5737 documentation data.
+- Fixed a missing optional-header crash that closed the first Digest challenge connection instead of returning HTTP 401.
 - No automatic Candidate activation is included.

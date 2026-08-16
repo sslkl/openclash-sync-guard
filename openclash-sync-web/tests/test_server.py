@@ -103,6 +103,11 @@ class ValidationTests(unittest.TestCase):
         })()
         self.assertIsNone(server.Handler.read_json(fake))
 
+    def test_missing_optional_header_values_are_empty(self):
+        headers = type("Headers", (), {"get_all": lambda _self, _name: None})()
+        handler = type("FakeHandler", (), {"headers": headers})()
+        self.assertEqual(server.Handler.header_values(handler, "Authorization"), [])
+
     def test_json_framing_rejects_duplicate_headers_and_short_body(self):
         class Headers:
             def __init__(self, values):

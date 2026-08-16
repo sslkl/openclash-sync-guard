@@ -630,7 +630,7 @@ class Handler(SimpleHTTPRequestHandler):
             return None
 
     def header_values(self, name: str) -> list[str]:
-        values = self.headers.get_all(name) if hasattr(self.headers, "get_all") else [self.headers.get(name)]
+        values = (self.headers.get_all(name) or []) if hasattr(self.headers, "get_all") else [self.headers.get(name)]
         return [value for value in values if value is not None]
 
     def authorize(self) -> bool:

@@ -20,11 +20,12 @@ Scope: the public source tree only. No router, VM, subscription endpoint, produc
 | F-12 | Installer trust | Validated service accounts, directory modes, ED25519 keys, exact host-key records, regular source assets, copied bytes, and target-bound uninstall receipts. |
 | F-13 | Origin and interpreter environment | Added strict allowed-origin parsing and Host binding, documented TLS boundaries, and cleared Lua/Ruby/Bundler/loader environment in forced commands. |
 | F-14 | Reconstructable release markers | Removed split-string private marker checks and synthetic RFC 1918 fixtures; the public verifier now uses generic workspace/device patterns and RFC 5737 documentation addresses only. |
+| F-15 | Missing optional HTTP headers | Normalized `HTTPMessage.get_all()` missing values to an empty list so unauthenticated requests receive a Digest 401 challenge instead of an unhandled `TypeError`. |
 
 ## Verification performed
 
-- 128 deterministic non-listener tests passed locally: worker 12, reconciler 10, router builder 17, customizer 22, web non-listener tests 57, renderer 5, public-packaging gates 5.
-- The final exact-commit suite contains 134 tests. Its six loopback HTTP/Digest tests remain pending on GitHub Actions because the final local runner could not obtain loopback-listener permission; an earlier commit's HTTP PASS is not counted here.
+- 129 deterministic non-listener tests passed locally: worker 12, reconciler 10, router builder 17, customizer 22, web non-listener tests 58, renderer 5, public-packaging gates 5.
+- The final exact-commit suite contains 135 tests. Its six loopback HTTP/Digest tests remain pending on GitHub Actions because the final local runner could not obtain loopback-listener permission; an earlier commit's HTTP PASS is not counted here.
 - All shell files parsed with `sh -n`; ShellCheck warning-level gate passed.
 - Python Bandit medium/high gate passed; critical Ruff syntax/name checks passed.
 - Lua router agent parsed successfully; frontend JavaScript passed `node --check`.
@@ -38,4 +39,4 @@ Scope: the public source tree only. No router, VM, subscription endpoint, produc
 - Dropbear option support varies by router release; compatibility must be audited on each target.
 - Offline PASS cannot prove a production core, network path, converter, DNS result, service restart, or rollback.
 - This review was performed by the project maintainer workflow and is not an independent penetration test.
-- Release status remains `HTTP RECHECK PENDING` until GitHub Actions passes all 134 tests on the exact published commit.
+- Release status remains `HTTP RECHECK PENDING` until GitHub Actions passes all 135 tests on the exact published commit.
