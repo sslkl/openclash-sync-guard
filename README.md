@@ -63,7 +63,7 @@ Never commit subscription URLs, raw YAML, passwords, HA1 files, private keys, `k
 
 ## Audit status
 
-The initial public release was reviewed on 2026-08-16 with offline unit/integration tests, ShellCheck, Bandit, pip-audit, Lua parsing, manifest verification, and a sensitive-data scan. See the [sanitized audit report](docs/SECURITY-AUDIT-2026-08-16.md). This is not a formal third-party penetration test.
+The initial public release was reviewed on 2026-08-16 with 129 local non-listener tests and a 135-test GitHub Actions gate that includes six loopback HTTP/Digest tests. ShellCheck, Bandit, pip-audit, Lua parsing, manifest verification, and a sensitive-data scan also passed. The release tag is applied only after the exact tag target passes the full workflow. See the [sanitized audit report](docs/SECURITY-AUDIT-2026-08-16.md). This is not a formal third-party penetration test.
 
 ## License
 

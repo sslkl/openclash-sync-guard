@@ -25,7 +25,7 @@ Scope: the public source tree only. No router, VM, subscription endpoint, produc
 ## Verification performed
 
 - 129 deterministic non-listener tests passed locally: worker 12, reconciler 10, router builder 17, customizer 22, web non-listener tests 58, renderer 5, public-packaging gates 5.
-- The final exact-commit suite contains 135 tests. Its six loopback HTTP/Digest tests remain pending on GitHub Actions because the final local runner could not obtain loopback-listener permission; an earlier commit's HTTP PASS is not counted here.
+- GitHub Actions Offline CI passed the corrected 135-test source tree: reconciler 10, worker 12, renderer/public-packaging 10, web 64 (including six loopback HTTP/Digest tests), router builder 17, and customizer 22. The release tag is created only after the same workflow passes the final documentation/checksum commit.
 - All shell files parsed with `sh -n`; ShellCheck warning-level gate passed.
 - Python Bandit medium/high gate passed; critical Ruff syntax/name checks passed.
 - Lua router agent parsed successfully; frontend JavaScript passed `node --check`.
@@ -39,4 +39,4 @@ Scope: the public source tree only. No router, VM, subscription endpoint, produc
 - Dropbear option support varies by router release; compatibility must be audited on each target.
 - Offline PASS cannot prove a production core, network path, converter, DNS result, service restart, or rollback.
 - This review was performed by the project maintainer workflow and is not an independent penetration test.
-- Release status remains `HTTP RECHECK PENDING` until GitHub Actions passes all 135 tests on the exact published commit.
+- Release decision: `AUDIT PASS`, with a fail-closed gate that permits `v1.0.0` only on the final commit whose Offline CI run passes all 135 tests.

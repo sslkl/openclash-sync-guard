@@ -97,7 +97,7 @@ macOS 校验：
 
 ## 审核状态
 
-首个公开版于 2026-08-16 完成离线单元/集成测试、ShellCheck、Bandit、pip-audit、Lua 解析、清单校验和敏感信息扫描。详见 [脱敏审核报告](docs/SECURITY-AUDIT-2026-08-16.md)。这不是第三方正式渗透测试。
+首个公开版于 2026-08-16 完成 129 项本地非监听测试，并以 GitHub Actions 运行包含 6 项 loopback HTTP/Digest 集成测试的 135 项完整门禁；ShellCheck、Bandit、pip-audit、Lua 解析、清单校验和敏感信息扫描也通过。只有最终标签指向的精确提交再次通过完整工作流后才创建发布标签。详见 [脱敏审核报告](docs/SECURITY-AUDIT-2026-08-16.md)。这不是第三方正式渗透测试。
 
 ## 许可证
 
