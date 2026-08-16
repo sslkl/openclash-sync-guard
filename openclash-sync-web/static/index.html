@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="OpenClash 双路由器配置同步、校验与回滚管理台">
+  <title>OpenClash 同步管理台</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">OC</span></div>
+    <div class="top-status"><span class="status-dot"></span><span id="modeText">正在连接管理服务…</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div><p class="eyebrow">配置控制中心</p><h1>OpenClash同步器</h1><p>统一管理主配置与两个机场文件。所有写入都会先执行 YAML（配置文件格式）语法检查、结构检查和 SHA-256（摘要）并发保护。</p></div>
+      <button class="ghost" id="refreshStatus">刷新状态</button>
+    </section>
+
+    <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
+
+    <section class="target-grid" id="targetGrid" aria-label="路由器状态"></section>
+
+    <section class="workspace">
+      <nav class="sidebar" aria-label="功能导航">
+        <button class="nav-item active" data-panel="updates"><span>01</span>快速更新</button>
+        <button class="nav-item" data-panel="custom"><span>02</span>域名/IP 与 Fake-IP</button>
+        <button class="nav-item" data-panel="editor"><span>03</span>配置浏览与修改</button>
+        <button class="nav-item" data-panel="rollback"><span>04</span>主配置回滚</button>
+        <div class="term-card"><strong>术语说明</strong><p><b>Stage（暂存）</b><br>生成并校验候选文件，但不切换当前运行配置。</p><p><b>ACTIVE（当前启用配置）</b><br>OpenClash 当前选择的静态主配置路径。</p><p><b>SHA-256（摘要）</b><br>文件的内容校验值，用于识别变化和防止覆盖。</p><p><b>UCI（OpenWrt 配置接口）</b><br>路由器的系统配置数据库；本管理台不会更改 ACTIVE/UCI。</p></div>
+      </nav>
+
+      <div class="panels">
+        <section class="panel active" id="updates">
+          <div class="panel-head"><div><p class="eyebrow">日常操作</p><h2>快速更新</h2><p>选择目标路由器后，按单项按钮执行。主配置会先生成 Candidate（候选配置）、通过检查和备份后再原子替换；不会自动 reload（重新加载）运行内核。</p></div></div>
+          <label class="field-label" for="updateTarget">目标路由器</label>
+          <select id="updateTarget"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select>
+          <div class="action-grid">
+            <article class="action-card primary-card"><div class="card-icon">主</div><div><h3>更新主配置文件</h3><p>重新生成 Candidate（候选配置），通过 Mihomo（OpenClash 核心）检查、备份后更新静态主配置。</p></div><button data-action="stage-main">检查并更新</button></article>
+            <article class="action-card"><div class="card-icon amber">M</div><div><h3>更新 Maying 机场文件</h3><p>调用 OpenClash 单订阅更新入口；可能触发配置检查。</p></div><button data-action="update-maying">更新 Maying</button></article>
+            <article class="action-card"><div class="card-icon blue">N</div><div><h3>更新 Nexitally 机场文件</h3><p>只更新目标路由器本机的 ProviderBase.yaml。</p></div><button data-action="update-nexitally">更新 Nexitally</button></article>
+          </div>
+        </section>
+
+        <section class="panel" id="custom">
+          <div class="panel-head"><div><p class="eyebrow">独立定制</p><h2>域名/IP 分流与 Fake-IP Filter</h2><p>自定义分流规则会放在主配置规则最前面，优先于订阅规则；Fake-IP Filter（虚拟 IP 过滤黑名单）中的域名将使用真实 DNS（域名解析）结果，不分配 Fake-IP。</p></div></div>
+          <div class="custom-toolbar">
+            <label>目标路由器<select id="customTarget"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select></label>
+            <button class="ghost" id="loadCustom">读取当前定制</button>
+          </div>
+          <div class="custom-section">
+            <div class="section-title"><div><h3>域名/IP 分流规则</h3><p>DOMAIN 为精确域名，DOMAIN-SUFFIX 为域名后缀，IP-CIDR/IP-CIDR6 为 IPv4/IPv6 网段；DIRECT 表示直连，也可选择当前主配置中的业务分组。业务分组名来自主配置，保持原名显示。</p></div><button class="ghost small-button" id="addRule">＋ 添加规则</button></div>
+            <div class="example-strip"><b>输入示例</b><code>DOMAIN · api.example.com · DIRECT</code><code>DOMAIN-SUFFIX · example.com · AI</code><code>IP-CIDR · 198.51.100.0/24 · 🎯Direct</code></div>
+            <div class="custom-list" id="ruleList"></div>
+          </div>
+          <div class="custom-section">
+            <div class="section-title"><div><h3>Fake-IP Filter 黑名单</h3><p>适合局域网设备、局域网域名或不兼容 Fake-IP 的服务。禁止单独输入 <code>*</code>。</p></div><button class="ghost small-button" id="addFilter">＋ 添加黑名单</button></div>
+            <div class="example-strip"><b>输入示例</b><code>printer.lan</code><code>*.example.com</code><code>+.example.com</code></div>
+            <div class="custom-list" id="filterList"></div>
+          </div>
+          <div class="custom-footer">
+            <div class="custom-status-block">
+              <span id="customValidation" class="validation idle">请先读取当前定制</span>
+              <label class="restart-confirm"><input type="checkbox" id="customConfirm">我知道主配置发生变化时会重启目标路由器的 OpenClash，通常需要 1–3 分钟；失败时会自动恢复。内容未变化则不会重启。</label>
+            </div>
+            <div><button class="ghost" id="validateCustom">检查全部语法</button><button class="primary" id="saveCustom" disabled>校验并保存定制</button></div>
+          </div>
+        </section>
+
+        <section class="panel" id="editor">
+          <div class="panel-head"><div><p class="eyebrow">YAML（配置文件格式）编辑器</p><h2>浏览与修改当前配置</h2><p>读取文件后会记录原始 SHA-256（摘要）；若服务器端文件已变化，保存会被拒绝。</p></div></div>
+          <div class="editor-toolbar">
+            <label>目标路由器<select id="editorTarget"><option value="router_a">路由器 A</option><option value="router_b">路由器 B</option></select></label>
+            <label>配置文件<input id="fileName" value="ProviderBase-ProviderSource.yaml" placeholder="示例：ProviderBase.yaml"></label>
+            <button class="ghost" id="readConfig">读取当前文件</button>
+          </div>
+          <div class="editor-shell">
+            <div class="line-numbers" id="lineNumbers" aria-hidden="true">1</div>
+            <textarea id="yamlEditor" spellcheck="false" aria-label="YAML 配置内容" placeholder="proxies:&#10;  - name: 示例节点&#10;    type: ss&#10;proxy-groups: []&#10;rules: []"></textarea>
+          </div>
+          <div class="validation-row"><span id="validationState" class="validation idle">等待输入</span><span id="cursorPosition">第 1 行，第 1 列</span><span id="fileHash">SHA-256：尚未读取</span></div>
+          <div class="editor-actions"><button class="ghost" id="validateYaml">检查 YAML 语法</button><button class="primary" id="saveConfig" disabled>校验并保存</button></div>
+        </section>
+
+        <section class="panel" id="rollback">
+          <div class="panel-head"><div><p class="eyebrow danger-text">高风险操作</p><h2>回滚主配置文件</h2><p>恢复最近一个内容不同且通过校验的主配置备份。回滚前将再次备份当前文件并执行 Mihomo（OpenClash 核心）静态检查。</p></div></div>
+          <div class="warning"><strong>注意</strong><p>回滚只替换静态主配置并重放当前定制项；不会切换 ACTIVE（当前启用配置）、写入 UCI（OpenWrt 配置接口）或 reload（重新加载）运行内核。历史备份不会删除。</p></div>
+          <label class="field-label" for="rollbackTarget">目标路由器</label>
+          <select id="rollbackTarget"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select>
+          <label class="field-label" for="rollbackPhrase">确认短语</label>
+          <input id="rollbackPhrase" placeholder="请输入：确认回滚主配置" autocomplete="off">
+          <small class="help">输入必须完全一致，用于避免误触。</small>
+          <button class="danger" id="rollbackButton" disabled>回滚主配置</button>
+        </section>
+      </div>
+    </section>
+  </main>
+  <footer>OpenClash Publisher V4（发布器第四版） · 内网管理界面 · 不在浏览器保存订阅地址或配置内容</footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

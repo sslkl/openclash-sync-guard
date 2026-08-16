@@ -1,0 +1,42 @@
+[Unit]
+Description=OpenClash Sync Web Console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=syncsvc
+Group=syncsvc
+WorkingDirectory=/opt/openclash-sync-web
+Environment=OPENCLASH_WEB_HOST=192.0.2.20
+Environment=OPENCLASH_WEB_PORT=8088
+Environment=OPENCLASH_WEB_HELPER=/usr/local/sbin/openclash-web-helper
+Environment=OPENCLASH_WEB_AUTH_USER=openclash-admin
+Environment=OPENCLASH_WEB_AUTH_HA1_FILE=/opt/openclash-sync-web/auth-ha1
+Environment=OPENCLASH_WEB_ALLOWED_HOSTS=192.0.2.20:8088,127.0.0.1:18088
+Environment=OPENCLASH_WEB_ALLOWED_ORIGINS=http://192.0.2.20:8088,http://127.0.0.1:18088
+Environment=OPENCLASH_WEB_ALLOWED_NETWORKS=192.0.2.0/24,127.0.0.0/8
+ExecStart=/usr/bin/python3 /opt/openclash-sync-web/server.py
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+TasksMax=64
+MemoryMax=256M
+LimitNOFILE=1024
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
