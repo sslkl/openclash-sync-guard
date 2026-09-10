@@ -109,7 +109,8 @@
 - 浏览器合成测试使用隔离 profile、合成 API/认证及受控离线资源，明确真实后端/外网是否参与。桌面、手机、低高度、键盘、焦点、长输入和错误状态分别复核。
 - GUI 截图、HTTP/native、runtime 与真实业务端到端属于不同证据。没有已认证真实会话就标 `NOT RUN`，不复制凭据补齐指标。
 - 安全工具保留实际退出码、告警与扫描范围；告警需分诊，不新增 suppression 只为减少数量。缺工具/skip 不计作完整 PASS，扫描通过不承诺零漏洞。
-- Ruff 正确性门禁 `--isolated --no-cache --select E9,F,B023,PLW1510` 已本地实跑通过；完整规则扫描与选择性门禁分开记录，不能说全量 Ruff 无告警。本地 Ruff 与 CI 固定版本不同，远端 CI 尚未运行。
+- Ruff 正确性门禁 `--isolated --no-cache --select E9,F,B023,PLW1510` 已本地实跑通过；完整规则扫描与选择性门禁分开记录，不能说全量 Ruff 无告警。本地 Ruff 与 CI 固定版本不同。[初次 CI #13](https://github.com/sslkl/openclash-sync-guard/actions/runs/34447188599)因 Linux 认证测试临时目录夹具失败，后续静态步骤当时未执行；错误栈已读取、夹具已修复。跟进结果以[对应提交的 Actions](https://github.com/sslkl/openclash-sync-guard/actions?query=branch%3Acodex%2Faudit-ui-converter-release)为准，不用本地通过覆盖远端失败，也不放宽门禁来凑绿。
+- 认证测试必须在祖先目录均不可被 group/world 写入的可信 checkout 内运行；合成 HA1 夹具显式使用 checkout 下的私有临时目录。不要把整个 checkout 放在共享 `/tmp`，不要 chmod 系统 `/tmp`、跳过认证测试或放宽生产 `auth_directory_chain_ok()`。新增回归覆盖直接父目录和上层祖先的 `0720`、`0702`、`0777`、`01777`，确保 sticky bit 也不构成信任例外。
 - Bandit 策略覆盖全部项目源码（含测试），使用 `--ignore-nosec`。MEDIUM 逐项按精确代码上下文复审；未知 MEDIUM、任何 HIGH 或陈旧例外必须失败，LOW 保留计数而非宣称已消除。行号移动不构成豁免，代码上下文改变须重新审阅，不能靠文件名、告警代码或总数相同凑绿。实际扫描范围/计数见验证记录。依赖公告检查与静态检查分开；本轮未查就标 `NOT RUN`，即使固定 PyYAML 查询通过也不覆盖镜像、宿主或固件。
 - 扫描器 JSON 输出因合成 surrogate 等编码问题失败，是报告工具错误，不是“零告警”。保留可用 metadata 与失败状态，单独验证报告/策略的失败处理；不可把不完整 JSON 当成功扫描结果。
 - 不对含私有配置或输出的目录执行全树扫描；公开测试副本和私有渲染副本分开。只读授权不因脱敏输出而扩大。

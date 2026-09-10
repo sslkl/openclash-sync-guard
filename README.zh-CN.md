@@ -6,15 +6,15 @@
 
 **stage CLI 默认只准备 Candidate；扩展 Web 是单独的特权操作入口，获准的动作可以替换配置文件，部分操作可能重启 OpenClash。** 不要把所有 Web 按钮都理解成 stage-only。
 
-> **2026-09-10 候选：源项目/公开副本最终回归及已完成的生产分层检查 PASS；GUI 验收与 GitHub 发布仍待完成。** 部署前后比较、只读 HTTP、converter/native 与备份检查已在记录范围内通过。
+> **2026-09-10：审计分支与附注标签已发布，跟进版本修复了 Linux CI 的测试夹具问题。** 本地回归和限定生产检查按下文记录；真实 GUI 验收仍未完成。
 >
-> **回归证据：** 源项目（`source-comprehensive-final03`）与公开副本（`public-comprehensive-final02`）最终 Web Python 全量各通过 904 项。公开必要离线检查通过；该离线入口仍记录 `REAL_RUNTIME_SHAPE=NOT_RUN`、`NATIVE_PARSER_PROBES=NOT_RUN`。
+> **回归证据：** 夹具修复后，源项目（`source-ci-fixture-full02`）与公开副本（`public-ci-fixture-full02`）独立 Web Python 全量各通过 905 项，公开必要离线门禁通过；该离线入口仍记录 `REAL_RUNTIME_SHAPE=NOT_RUN`、`NATIVE_PARSER_PROBES=NOT_RUN`。认证测试要求 checkout 的祖先目录均不可被 group/world 写入，不要放在共享 `/tmp` 下，也不要修改系统 `/tmp` 权限或关闭生产认证检查来凑绿。
 >
-> **限制：** 操作端 Mac 已解锁，曾看到新版已登录页；用户并行使用 Safari，完整只读 GUI 验收尚未完成，macOS 真实外观切换也未执行，两项均为 PENDING。write-check 为 `SKIPPED`，`restore_drill=NOT_RUN`。离线 Chromium 43/43 不是生产 GUI 验收。
+> **限制：** 已在 Safari 看到新版已登录的浅色页面；后续只读刷新被 Mac 锁屏阻止，完整交互与 macOS 真实外观切换仍为 PENDING。write-check 为 `SKIPPED`，`restore_drill=NOT_RUN`。离线 Chromium 43/43 不是生产 GUI 验收。
 >
 > **安全证据：** `public-security-final03` 仍为 `PASS_WITH_SKIPS`：HIGH 0、已审阅 MEDIUM 15、保留 LOW 254，脚本内依赖查询跳过。独立公告查询仅对固定 PyYAML 6.0.2 返回未发现已知漏洞，保留两条泛化 warning。已审阅发现或公告查询无已知漏洞均不代表零风险。
 >
-> **封版与发布：** 本地封版 ID 与门禁结果以交付回执为准，不在此预先声明。GitHub push/PR/远端读回仍未完成，尚无 GitHub 写入。证据范围及剩余门禁见[验证记录](docs/VALIDATION-2026-09-09.md)。
+> **封版与发布：** 初次[分支](https://github.com/sslkl/openclash-sync-guard/tree/codex/audit-ui-converter-release)与[附注标签](https://github.com/sslkl/openclash-sync-guard/tree/audit-ui-converter-20260910)已原子推送并读回，提交为 `7a9c015c39bf4d7e42114cf1092767f0ca49ab44`，`main` 未变。[初次 CI #13](https://github.com/sslkl/openclash-sync-guard/actions/runs/34447188599)暴露认证测试使用 Linux 共享 `/tmp` 的夹具问题，生产目录信任检查正确拒绝了该路径。跟进版本只把合成夹具移入可信 checkout，并新增可写祖先目录拒绝回归；生产认证逻辑不变，旧标签不移动。后续结果查看[对应提交的 Actions](https://github.com/sslkl/openclash-sync-guard/actions?query=branch%3Acodex%2Faudit-ui-converter-release)及[验证记录](docs/VALIDATION-2026-09-09.md)，不把本地通过或 push 成功当成远端 CI 和完整生产验收。
 
 ## 核心能力
 

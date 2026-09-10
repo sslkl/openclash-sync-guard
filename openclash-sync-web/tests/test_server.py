@@ -281,7 +281,8 @@ class ValidationTests(unittest.TestCase):
         old_required = server.AUTH_REQUIRED
         old_path = server.AUTH_HA1_FILE
         try:
-            with tempfile.TemporaryDirectory() as directory:
+            # Test real path trust, not the platform-specific default temp root.
+            with tempfile.TemporaryDirectory(dir=ROOT) as directory:
                 root = pathlib.Path(directory).resolve()
                 digest = "a" * 64
                 auth = root / "auth-ha1"
@@ -305,6 +306,30 @@ class ValidationTests(unittest.TestCase):
         finally:
             server.AUTH_REQUIRED = old_required
             server.AUTH_HA1_FILE = old_path
+
+    def test_auth_ha1_rejects_writable_ancestor_directories(self):
+        with tempfile.TemporaryDirectory(prefix="openclash-auth-chain-", dir=ROOT) as directory:
+            root = pathlib.Path(directory).resolve()
+            child = root / "nested"
+            child.mkdir(mode=0o700)
+            auth = child / "auth-ha1"
+            digest = "a" * 64
+            auth.write_text(digest + "\n", encoding="ascii")
+            auth.chmod(0o600)
+            with mock.patch.object(server, "AUTH_REQUIRED", True), \
+                    mock.patch.object(server, "AUTH_HA1_FILE", str(auth)):
+                self.assertEqual(server.read_auth_ha1(), {"SHA-256": digest})
+                for ancestor in (root, child):
+                    for mode in (0o720, 0o702, 0o777, 0o1777):
+                        with self.subTest(ancestor=ancestor.name, mode=oct(mode)):
+                            ancestor.chmod(mode)
+                            try:
+                                self.assertFalse(server.auth_directory_chain_ok(child))
+                                with self.assertRaisesRegex(RuntimeError, "权限或类型无效"):
+                                    server.read_auth_ha1()
+                            finally:
+                                ancestor.chmod(0o700)
+                self.assertEqual(server.read_auth_ha1(), {"SHA-256": digest})
 
     def test_allowed_origins_are_explicit_and_host_bound(self):
         allowed = {"console.example.test", "127.0.0.1:18088"}

@@ -4,7 +4,7 @@
 
 ## 1. 状态与证据范围
 
-**2026-09-10 候选：源项目/公开副本最终回归及已完成的生产分层检查 PASS；GUI 与 GitHub 发布仍待完成。** 两份副本的最终 Web Python 全量各 904 项通过，公开必要离线门禁通过；最新 smoke 专项各 9/9，分别记录、不重复相加。部署比较、只读 HTTP、converter/native 和备份验收结果见第 7 节，不等于全部上线验收。文件名日期不是部署时间；本地封版 ID 与最终门禁结果以交付回执为准，不在此预填 ID 或声明成功。
+**2026-09-10：审计分支与附注标签已发布；初次 CI 暴露的 Linux 认证测试夹具问题已修复，生产认证逻辑不变。** 跟进源项目与公开副本独立 Web Python 全量各 905 项通过，公开必要本地离线门禁通过；真实 GUI 验收仍未完成。远端结果须读取对应提交的 CI，不能用本地通过覆盖；初次失败记录保留。部署比较、只读 HTTP、converter/native 和备份验收见第 7 节，不等于全部上线验收；发布身份见第 8 节。
 
 每项结果只对应其受验代码、对象与时间；源项目与公开副本分别记录，不相加或互相替代。较早的全量、静态及渲染/runtime 构建仅作历史，最新结果在各节单列；此后输入变化仍须重验。依赖公告查询只覆盖固定依赖及查询时点，不扩大为全代码安全验收。生产 native 通过不改写本轮或较早离线日志中的 `NOT_RUN`，HTTP/native 结果不代替 GUI 或业务流量结论。原始输出及中间失败证据私有留存，公开摘要不包含工作区路径、真实设备标识、地址、凭据或生产摘要。
 
@@ -12,17 +12,17 @@
 | --- | --- | --- |
 | 8 份公开 Markdown 的最终结构、链接、术语与脱敏 | 以联合 QC / 交付回执为准 | 联合文档检查与最终文档全树扫描分别记录；不预先声明通过 |
 | 最终公开白名单、双层清单与 working/staged 门禁 | 以交付回执为准 | 对最终实际字节核对集合、摘要与授权范围；本地封版 ID 不在此预填 |
-| 源项目最终 Web Python 全量 | PASS | `source-comprehensive-final03`：904 项，152.355 秒；采集 152.548408 秒 / exit 0，无超时，退出后进程组为空 |
-| 公开副本最终 Web Python 全量 | PASS | `public-comprehensive-final02`：904 项，152.447 秒；不是借用源项目结果 |
+| 源项目跟进 Web Python 全量 | PASS | `source-ci-fixture-full02`：905 项，151.493 秒；采集 151.680996 秒 / exit 0，无 skip、无超时，退出后进程组为空 |
+| 公开副本跟进 Web Python 全量 | PASS | `public-ci-fixture-full02`：905 项，154.125 秒；整套采集 158.369719 秒 / exit 0，无 skip、无超时，退出后进程组为空；不是借用源项目结果 |
 | 最新 smoke 专项 | PASS | 源项目 / 公开副本各 9/9，新增 4 项回归；与全量分开记录、不相加 |
-| 公开副本最终全套及离线门禁 | PASS | 根 69 项，Lua agent/capture 147/14；必要离线门禁 PASS，LIVE_CHANGES=false；该入口 runtime-shape/native-parser probes 仍为 NOT_RUN |
+| 公开副本本地跟进全套及离线门禁 | PASS（本地） | 根 69 项，Lua agent/capture 147/14；五语言语法及必要本地离线门禁 PASS，LIVE_CHANGES=false；该入口 runtime-shape/native-parser probes 仍为 NOT_RUN |
 | 合成拓扑渲染及自动摘要重绑定 | PASS（本地合成） | `synthetic-render-final02`：77 个文件、根/Web 清单成员 75/37；不是生产 root 目录链验收 |
 | 本地 runtime 构建后独立验证 | PASS（本地合成） | `public-runtime-independent-final02`：31/31；12 文件与 manifest 合同，生产证据另列 |
 | 选择性静态正确性/安全门禁 | PASS_WITH_SKIPS | `public-security-final03`：静态 PASS；脚本内依赖查询 SKIP，15 MEDIUM 已审阅、254 LOW 保留 |
 | 固定 Python 依赖公告查询 | PASS（独立查询） | `public-dependency-advisory-final01`：PyYAML 6.0.2 未发现已知漏洞；保留两条 warning，不扩展到系统/原生镜像 |
 | 隔离合成浏览器与视觉 | PASS（离线场景） | Chromium 43/43；主代理视觉复核 7 张截图，见第 6 节 |
-| macOS 真实系统外观切换 | PENDING | Mac 已解锁；真实系统切换尚未执行，合成媒体查询测试不替代此项 |
-| 源项目已认证生产 GUI | PENDING | 已在 Safari 看到新版已登录页面；交互验收尚未完成，只读 HTTP 成功不代表 GUI 完成 |
+| macOS 真实系统外观切换 | PENDING | 尚未执行；最近交互尝试受 Mac 锁屏阻止，合成媒体查询测试不替代此项 |
+| 源项目已认证生产 GUI | PENDING | 已在 Safari 看到新版已登录的浅色页面；后续只读刷新被锁屏阻止，不能将页面可见或只读 HTTP 成功计为完整交互通过 |
 | 本公开副本的已认证真实 GUI | NOT RUN | 公开副本使用示例拓扑，未部署到真实认证环境；不借用源项目页面证据 |
 | 本公开副本的真实设备/业务流量/外部服务 | NOT RUN | 本副本仅有离线与合成验收；源项目的生产分层检查另列 |
 | 本轮生产 worker 整组 updater | PASS（updater 回执） | 服务 ACTIVE/ENABLED，本轮重启服务、未改防火墙 |
@@ -35,7 +35,8 @@
 | 生产备份核验 | PASS（核验范围） | 8 个资产、COMMITTED 与旧 runtime 13 项通过；不是恢复演练 |
 | 真实业务流量/外部服务 | NOT RUN | 本记录没有该层验收证据，不以 HTTP/converter/native 结果替代 |
 | 真实恢复演练 | NOT RUN | restore_drill=NOT_RUN；更新时的服务重启不等于恢复演练 |
-| 远端 GitHub CI、写入及发布 | NOT RUN | 尚未写入；仓库归属已确认，受检 HTTPS/SSH 443 通道未完成认证，见第 8 节 |
+| GitHub 分支与附注标签写入/读回 | PASS（精确两个 refs） | 已原子推送并读回初次发布提交 `7a9c015c39bf4d7e42114cf1092767f0ca49ab44`；main 未变，根工作区未推送 |
+| 初次发布 GitHub CI | FAIL（历史保留） | [分支 #13](https://github.com/sslkl/openclash-sync-guard/actions/runs/34447188599)与[标签 #14](https://github.com/sslkl/openclash-sync-guard/actions/runs/34447190614)失败；#13 错误栈确认 Linux 共享 TMPDIR 认证夹具问题，已只修复测试；跟进结果见[对应提交的 Actions](https://github.com/sslkl/openclash-sync-guard/actions?query=branch%3Acodex%2Faudit-ui-converter-release) |
 
 `PASS` 只覆盖记录的对象和场景，`PASS_WITH_SKIPS` 不包含未执行的检查；`FAIL` 为可观察失败；`HOLD` 为门禁不满足；`PENDING` 为流程未完成；`UNKNOWN` 为无法确认；`NOT RUN` 表示本记录没有相应执行证据，`SKIPPED` 为该步骤被跳过。未知写入结果可能已提交，不能通过再次写入“验证”。本记录不承诺零漏洞。
 
@@ -49,7 +50,7 @@
 4. 保留源码身份、工具版本、真实退出码、stdout/stderr 与漂移检查；公开记录不包含真实设备信息、私有账号/凭据、工作区路径或生产哈希。
 5. 依赖、镜像、公告查询可能联网，先核对范围。本轮离线/静态 runner 阻止非 loopback 网络及生产命令；依赖公告查询在单独步骤执行，不是离线 PASS 的一部分。
 
-## 3. 离线回归：源项目与公开副本最终结果
+## 3. 离线回归：初次发布基线与 CI 跟进结果
 
 ### 较早完整离线运行（smoke 修改前）
 
@@ -74,7 +75,7 @@
 
 主代理将 `production_smoke` 的旧标题硬编码判断改为与当前 `static/index.html` 字节级匹配，并新增 4 项回归；源项目与公开副本的 smoke 专项各 **9/9 PASS**。这是验收工具及专项测试的结果，不是 GUI 验收。
 
-**源项目最终全量：904 项 PASS。** 主代理核实 `source-comprehensive-final03` 的 RAW stderr 末尾为 `Ran 904 tests in 152.355s` / `OK`；采集耗时 **152.548408 秒**、exit `0`、无超时、退出后进程组为空。152.355 秒是测试套件报告时间，与整个采集过程的耗时分开记录。
+**初次发布前源项目全量：904 项 PASS（历史基线）。** 主代理核实 `source-comprehensive-final03` 的 RAW stderr 末尾为 `Ran 904 tests in 152.355s` / `OK`；采集耗时 **152.548408 秒**、exit `0`、无超时、退出后进程组为空。152.355 秒是测试套件报告时间，与整个采集过程的耗时分开记录。
 
 **公开副本最终全套：PASS。** 主代理核实 `public-comprehensive-final02`：采集 **156.623771 秒**、exit `0`，RAW 未见 warning、traceback 或失败提示。该结果不借用源项目或专项结果。
 
@@ -88,6 +89,12 @@
 | 额外 runtime-shape / native-parser probes | `REAL_RUNTIME_SHAPE=NOT_RUN` / `NATIVE_PARSER_PROBES=NOT_RUN` |
 
 900 项属于上述 smoke 修改前的历史全量，不能继续用作当前最终计数；也不将两份副本、wrapper 内外或专项计数重复累加。最终离线 PASS 仍不包含未运行的额外 probes；第 7 节生产 native 是独立证据。
+
+### 2026-09-10 CI 认证夹具可移植性修复
+
+初次 Linux CI 的两个认证错误已在本机强制共享 TMPDIR 下精确复现。根因是测试使用默认临时目录，而生产 HA1 检查有意拒绝任一 group/world 可写祖先；macOS 默认临时目录掩盖了这一夹具假设。仅将两处合成夹具移入可信 checkout，新增直接父级及上层祖先分别为 `0720`、`0702`、`0777`、`01777` 的 8 个拒绝子案例，未改生产认证代码。checkout 也必须位于可信目录链；不要 chmod 系统 `/tmp`、跳过测试或弱化信任检查。
+
+修复后在共享 TMPDIR 下，源项目/公开副本定向各 86 项通过；独立全量各 905 项通过，最新时间与采集范围见第 1 节。公开全套另有根 Python 69、Lua agent 147、capture 14 及五语言语法 PASS。`public-ci-fixture-security01` 静态复验为 PASS_WITH_SKIPS：Ruff 与 ShellCheck 通过，Bandit HIGH 0 / 已审阅 MEDIUM 15 / LOW 254、未知及陈旧审阅均为 0；该入口依赖查询仍跳过。最初本地跟进因未刷清单失败、源项目首次跟进因私有测试沙箱未允许新夹具目录失败，均保留原始记录；分别修正清单与测试 profile 后重跑，不属于生产权限放宽。
 
 ### 2026-09-10 格式边界修复
 
@@ -131,7 +138,7 @@ python -m pip install -r openclash-sync-web/requirements.txt
 ./tools/run_offline_checks.sh
 ```
 
-前轮工具记录：Python 3.11.15、Ruby 2.6.10p210、Node 22.22.3、Lua 5.1.5、Ruff 0.16.6、Bandit 1.9.4、ShellCheck 0.11.0、pip-audit 2.10.1；前轮 CI 配置记录为 Python 3.12、Ruby 3.3、Node 22、Lua 5.1、Ruff 0.16.3。最终交付须核对实际工具/CI 版本；远端 CI 未运行，本地结果不冒充远端结果。
+前轮工具记录：Python 3.11.15、Ruby 2.6.10p210、Node 22.22.3、Lua 5.1.5、Ruff 0.16.6、Bandit 1.9.4、ShellCheck 0.11.0、pip-audit 2.10.1；CI 配置为 Python 3.12、Ruby 3.3、Node 22、Lua 5.1，固定开发依赖中的 Ruff 为 0.16.3。初次 CI #13 的认证夹具错误栈已读取，工具版本未逐项从远端日志核对；配置版本不是实际版本证据，本地结果不冒充远端结果。
 
 测试可创建临时文件和 loopback listener；“offline”名称不是无副作用证明。安装器只做语法检查，不执行安装、启用或重启。
 
@@ -225,7 +232,7 @@ CGNAT fixture 变化曾使一条 B104 的精确上下文复核失效：静态入
 
 本轮界面使用 CSS tokens / `prefers-color-scheme` 即时切换外观，不刷新或丢弃草稿；YAML 编辑器固定深色。新增原生折叠三步入门、六导航编号与用途、≤600px 两列导航、分级帮助与 `UNKNOWN`/ACTIVE 风险说明。“本页读取于”表示浏览器成功读取完成时间，不是服务器采样时间。`escapeHtml` 使用纯字符串转义，无效 panel ID 不切换面板。
 
-**已认证生产 GUI 与 macOS 真实外观切换：PENDING。** Mac 已解锁，曾通过 Safari 看到新版已登录页面；用户并行操作 Safari 时，工具停止了冲突动作，因此完整只读交互尚未完成。真实系统外观切换尚未执行，不把页面可见或工具因并行操作而停止记为验收通过或产品失败。离线浏览器可以验证被模拟的偏好与交互，不能证明操作系统真实切换、认证链路或所有设备均已验收；空错误列表也不是全链路安全或主动外联审计。
+**已认证生产 GUI 与 macOS 真实外观切换：PENDING。** 已通过 Safari 看到新版已登录的浅色页面，导航与引导可见；随后只读刷新动作被 Mac 锁屏阻止，完整交互与真实系统外观切换尚未执行。不将页面可见、旧状态展示或锁屏阻止记为验收通过或产品失败。离线浏览器可以验证被模拟的偏好与交互，不能证明操作系统真实切换、认证链路或所有设备均已验收；空错误列表也不是全链路安全或主动外联审计。
 
 ### 前轮 30 场景基线（仅历史）
 
@@ -259,7 +266,7 @@ CGNAT fixture 变化曾使一条 B104 的精确上下文复核失效：静态入
 
 生产 native 53/53 与第 3 节本轮及较早离线 probes 是不同入口，不能改写离线日志的 `NOT_RUN`。前后容器为 0 是边界时刻的计数，不等于过程中从未创建过临时容器。备份核验通过也不等于已执行恢复。
 
-**剩余 GUI/macOS 验收：PENDING。** Mac 已解锁，Safari 已显示新版已登录生产页；完整只读交互与真实系统外观切换尚未执行。 write-check 保留 SKIPPED，restore_drill 保留 NOT_RUN；不把这些未完成项、真实取源或业务流量补写为通过。
+**剩余 GUI/macOS 验收：PENDING。** Safari 已显示新版已登录的浅色页面；后续只读刷新受 Mac 锁屏阻止，完整只读交互与真实系统外观切换仍未完成。write-check 保留 SKIPPED，restore_drill 保留 NOT_RUN；不把这些未完成项、真实取源或业务流量补写为通过。
 
 ### 后续限定只读复核
 
@@ -279,8 +286,8 @@ CGNAT fixture 变化曾使一条 B104 的精确上下文复核失效：静态入
 
 公开源码与受验产物要关联，实际命令、版本、退出码、skip/告警与漂移结果须可复核。文档检查仅验证文字、链接和格式，不能排除应用漏洞。历史失败不删除，未运行项不补写通过。
 
-原仓库 [sslkl/openclash-sync-guard](https://github.com/sslkl/openclash-sync-guard) 已由主代理通过登录 GitHub 浏览器确认归用户所有；受检 HTTPS 通道缺少非交互凭据；SSH 443 在官方公开 host keys 交叉核验及严格主机校验后，dry-run 返回 `Permission denied (publickey)`（exit 128，无远端写入）。这只证明已试通道未完成认证，不表示所有认证方式均不可用；未读取私钥、token 或浏览器凭据。仓库归属确认与认证诊断不等于已经 commit/push、远端 CI 通过或发布完成。
+原仓库 [sslkl/openclash-sync-guard](https://github.com/sslkl/openclash-sync-guard) 的[审计分支](https://github.com/sslkl/openclash-sync-guard/tree/codex/audit-ui-converter-release)与[附注标签](https://github.com/sslkl/openclash-sync-guard/tree/audit-ui-converter-20260910)已于 2026-09-10T06:52:17Z 经正常 Git 凭据助手原子推送。06:52:41Z 独立远端读回：分支与 tag peeled commit 均为 `7a9c015c39bf4d7e42114cf1092767f0ca49ab44`，annotated tag object 为 `fd84701c3ba3bcb7e0129dd33422797bec3706e5`；main 仍为 `bbe7de854778be30a60df85c8c479020c8926961`。早先认证失败属于历史诊断，不再作为当前发布阻塞；未提取浏览器 cookie 或向记录输出 token。
 
-外部写入前确认精确仓库、分支、可见性、文件范围和授权。只更新原公开项目，不上传父工作区，不合并受保护 main。远端 commit/PR/readback 才是上传证据；本地 commit、测试或旧 release 不能替代。GitHub 尚未写入，本记录不证明远端 CI、上传/发布或全部生产验收完成；已通过的限定范围生产项见第 7 节。
+外部写入前仍须核对精确仓库、分支、可见性、文件范围和授权。初次只更新原公开项目的两个 refs，没有推送父工作区、强推、合并或改变 main。[初次 CI #13](https://github.com/sslkl/openclash-sync-guard/actions/runs/34447188599)在“Run complete offline regressions and five-language syntax checks”步骤 exit 1；该次后续 Mihomo synthetic Candidate 与静态安全步骤未执行。已读取错误栈，确认是 Linux 共享 TMPDIR 与严格祖先目录信任检查不兼容的测试夹具假设；修复与独立本地复验见第 3 节，不放宽生产安全要求。初次标签 CI #14 亦独立读回 failure，旧失败和旧标签保留。
 
-本地封版 ID 与门禁结果以交付回执为准，不在文档中自引用尚未生成的 commit/tag ID。GitHub push/PR/远端读回仍未完成，远端 CI 与发布结果也须独立记录。源项目/公开副本最终全量、最新静态与本地合成产物结果已按前述证据更新，不再列为待跑；后续输入变化仍须重验。真实 GUI/macOS 检查仍待完成，不再将此前锁屏作为当前阻塞事实。保留 write-check=SKIPPED、restore_drill=NOT_RUN、静态入口内的依赖跳过及各轮离线 probes 的 NOT_RUN；独立依赖查询按第 4 节单列，不从现有 PASS 推断未执行项。
+初次发布已完成 push/远端读回，PR/合并未执行。CI 夹具修复已实现；后续提交的远端结果须查看[对应 SHA 的 Actions](https://github.com/sslkl/openclash-sync-guard/actions?query=branch%3Acodex%2Faudit-ui-converter-release)，不能沿用初次标签或本地 PASS。真实 GUI/macOS 检查仍待完成，不声明全部发布验收通过。后续代码、文档或清单变化按影响范围重验；保留 write-check=SKIPPED、restore_drill=NOT_RUN、静态入口依赖跳过与各轮离线 probes 的 NOT_RUN，独立依赖查询按第 4 节单列。

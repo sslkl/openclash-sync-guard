@@ -27,7 +27,8 @@ class HttpAuthTests(unittest.TestCase):
         cls.host = f"127.0.0.1:{cls.port}"
         cls.user = "test-admin"
         cls.password = "test-only-password"
-        cls.tmp = tempfile.TemporaryDirectory(prefix="openclash-http-auth-")
+        # HA1 files require trusted ancestors; Linux /tmp is deliberately rejected.
+        cls.tmp = tempfile.TemporaryDirectory(prefix="openclash-http-auth-", dir=ROOT)
         cls.tmp_root = Path(cls.tmp.name).resolve()
         source = f"{cls.user}:OpenClash Sync:{cls.password}".encode()
         ha1 = hashlib.sha256(source).hexdigest()
