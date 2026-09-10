@@ -39,6 +39,67 @@ check(tests,"dynamic build preserves base and applies normalized Maying") do
   raise unless candidate["proxies"].first==base["proxies"].first && candidate["rules"]==base["rules"]
   raise unless candidate["proxies"].select{|p|p["type"]=="ssr"}.all?{|p|p["tfo"]==false}
   raise unless candidate["dns"]["proxy-server-nameserver-policy"].length==6
+  raise unless result.receipt["maying_policy_host_count"]==6
+  raise unless result.receipt["maying_udp_true_count"]==6 && result.receipt["maying_tfo_false_count"]==6
+  raise unless result.receipt["maying_udp_runtime_verified"]==false
+  raise unless result.receipt["base_dns_sha256"].match?(/\A[0-9a-f]{64}\z/)
+  raise unless result.receipt["candidate_dns_sha256"].match?(/\A[0-9a-f]{64}\z/)
+end
+
+check(tests,"normalized Maying document shape rejects DNS rules and extra keys") do
+  {"MAYING_DNS_UNEXPECTED"=>maying.merge("dns"=>{}),
+   "MAYING_RULES_UNEXPECTED"=>maying.merge("rules"=>["MATCH,DIRECT"]),
+   "MAYING_DOCUMENT_SHAPE"=>maying.merge("mode"=>"rule")}.each do |reason,input|
+    begin
+      builder.build(base_bytes:YAML.dump(base),maying_bytes:YAML.dump(input),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+    rescue StandardError => error
+      raise unless error.message==reason
+      next
+    end
+    raise
+  end
+end
+
+check(tests,"base DNS ownership is preserved while Maying policy is appended") do
+  owned=YAML.safe_load(YAML.dump(base),permitted_classes:[Symbol],aliases:true)
+  owned["dns"]["proxy-server-nameserver-policy"]={"owned.example.invalid"=>["https://owned-resolver.example.invalid/dns-query"]}
+  result=builder.build(base_bytes:YAML.dump(owned),maying_bytes:YAML.dump(maying),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+  candidate=YAML.safe_load(result.candidate,permitted_classes:[Symbol],aliases:true)
+  policy=candidate.dig("dns","proxy-server-nameserver-policy")
+  raise unless policy["owned.example.invalid"]==owned.dig("dns","proxy-server-nameserver-policy","owned.example.invalid")
+  raise unless policy.length==7 && candidate["dns"]["nameserver"]==owned["dns"]["nameserver"]
+end
+
+check(tests,"identical existing Maying policy is deduplicated without overwrite") do
+  owned=YAML.safe_load(YAML.dump(base),permitted_classes:[Symbol],aliases:true)
+  host=maying_proxies.first["server"]
+  reversed=RouterStageBuilder::MAYING_RESOLVERS.reverse
+  owned["dns"]["proxy-server-nameserver-policy"]={host=>reversed}
+  result=builder.build(base_bytes:YAML.dump(owned),maying_bytes:YAML.dump(maying),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+  candidate=YAML.safe_load(result.candidate,permitted_classes:[Symbol],aliases:true)
+  raise unless candidate.dig("dns","proxy-server-nameserver-policy",host)==reversed
+  raise unless candidate.dig("dns","proxy-server-nameserver-policy").length==6
+end
+
+check(tests,"conflicting existing Maying policy holds") do
+  owned=YAML.safe_load(YAML.dump(base),permitted_classes:[Symbol],aliases:true)
+  owned["dns"]["proxy-server-nameserver-policy"]={maying_proxies.first["server"]=>["https://conflict.example.invalid/dns-query"]}
+  begin
+    builder.build(base_bytes:YAML.dump(owned),maying_bytes:YAML.dump(maying),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+  rescue StandardError => error
+    raise unless error.message=="DNS_POLICY_COLLISION"
+    next
+  end
+  raise
+end
+
+check(tests,"runtime DNS never owns Candidate DNS") do
+  changed_runtime=YAML.safe_load(YAML.dump(runtime),permitted_classes:[Symbol],aliases:true)
+  changed_runtime["dns"]={"nameserver"=>["https://runtime-only.example.invalid/dns-query"]}
+  result=builder.build(base_bytes:YAML.dump(base),maying_bytes:YAML.dump(maying),runtime_bytes:YAML.dump(changed_runtime),expected_maying_count:6)
+  candidate=YAML.safe_load(result.candidate,permitted_classes:[Symbol],aliases:true)
+  raise unless candidate["dns"]["nameserver"]==base["dns"]["nameserver"]
+  raise if YAML.dump(candidate).include?("runtime-only.example.invalid")
 end
 
 check(tests,"managed region references in runtime are rebuilt without duplication") do
@@ -149,6 +210,44 @@ check(tests,"IP literal proxy servers do not create DNS policy host entries") do
   raise unless result.receipt["dns_policy_host_count"]==0
 end
 
+check(tests,"malformed IP-like servers remain hostname policy entries") do
+  addresses=["999.1.1.1","01.2.3.4","2001:::1","2001:db8::1::2","[2001:db8::zz]","1:2:3:4:5:6:7"]
+  malformed_proxies=maying_proxies.each_with_index.map{|item,index|item.merge("server"=>addresses[index])}
+  malformed_maying={"proxies"=>malformed_proxies,"proxy-groups"=>source_names.zip(malformed_proxies).map{|group,node|{"name"=>group,"type"=>"url-test","proxies"=>[node["name"]]}}}
+  result=builder.build(base_bytes:YAML.dump(base),maying_bytes:YAML.dump(malformed_maying),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+  candidate=YAML.safe_load(result.candidate,permitted_classes:[Symbol],aliases:true)
+  policy=candidate.dig("dns","proxy-server-nameserver-policy")
+  raise unless policy.keys.sort==addresses.sort
+end
+
+check(tests,"canonical semantic hash is key-order stable and type tagged") do
+  first=builder.send(:semantic_sha256,{"b"=>[true,nil,1],"a"=>"1"})
+  reordered=builder.send(:semantic_sha256,{"a"=>"1","b"=>[true,nil,1]})
+  typed=builder.send(:semantic_sha256,{"a"=>1,"b"=>[true,nil,"1"]})
+  raise unless first==reordered && first!=typed && first.match?(/\A[0-9a-f]{64}\z/)
+end
+
+check(tests,"root-controlled base Symbol values are preserved") do
+  symbol_base=YAML.safe_load(YAML.dump(base),permitted_classes:[Symbol],aliases:true)
+  symbol_base["local-symbol-metadata"]=:preserved
+  result=builder.build(base_bytes:YAML.dump(symbol_base),maying_bytes:YAML.dump(maying),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+  candidate=YAML.safe_load(result.candidate,permitted_classes:[Symbol],aliases:false)
+  raise unless candidate["local-symbol-metadata"]==:preserved
+end
+
+check(tests,"untrusted Maying Symbol values remain rejected") do
+  symbol_maying=YAML.safe_load(YAML.dump(maying),permitted_classes:[Symbol],aliases:true)
+  symbol_maying["untrusted-symbol-metadata"]=:rejected
+  begin
+    builder.build(base_bytes:YAML.dump(base),maying_bytes:YAML.dump(symbol_maying),runtime_bytes:YAML.dump(runtime),expected_maying_count:6)
+  rescue StandardError => error
+    raise unless error.message=="YAML_CLASS"
+    next
+  end
+  raise
+end
+
+
 check(tests,"group-less converter output derives closed flag partition") do
   flagged_names=["🇭🇰 HK","🇯🇵 JP","🇸🇬 SG","🇺🇸 US","🇨🇳 TW","No Flag"]
   flagged_proxies=flagged_names.each_with_index.map{|name,index| proxy(name,"ssr","f#{index}.example.invalid",false)}
@@ -185,10 +284,9 @@ check(tests,"ambiguous controlled flags remain rejected") do
   raise
 end
 
-{"count mismatch"=>[7,maying],"tfo true"=>[6,maying.merge("proxies"=>maying_proxies.map{|p|p.merge("tfo"=>true)})],"duplicate node"=>[6,maying.merge("proxies"=>maying_proxies+[maying_proxies.first])],"region missing"=>[6,maying.merge("proxy-groups"=>maying["proxy-groups"][0,5])],"existing DNS policy"=>[6,maying]}.each do |name,(count,input)|
+{"count mismatch"=>[7,maying],"tfo true"=>[6,maying.merge("proxies"=>maying_proxies.map{|p|p.merge("tfo"=>true)})],"duplicate node"=>[6,maying.merge("proxies"=>maying_proxies+[maying_proxies.first])],"region missing"=>[6,maying.merge("proxy-groups"=>maying["proxy-groups"][0,5])]}.each do |name,(count,input)|
   check(tests,"reject #{name}") do
     altered=YAML.safe_load(YAML.dump(base),permitted_classes:[Symbol],aliases:true)
-    altered["dns"]["proxy-server-nameserver-policy"]={"x"=>["y"]} if name=="existing DNS policy"
     begin
       builder.build(base_bytes:YAML.dump(altered),maying_bytes:YAML.dump(input),runtime_bytes:YAML.dump(runtime),expected_maying_count:count)
     rescue StandardError

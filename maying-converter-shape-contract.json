@@ -1,0 +1,26 @@
+{
+  "schema": "publisher-v4-maying-converter-shape-contract-v2",
+  "source_format": "BASE64_SSR_URI_LIST",
+  "allowed_top_level_keys": ["allow-lan", "external-controller", "log-level", "mode", "port", "proxies", "proxy-groups", "rules", "socks-port"],
+  "required_top_level_keys": ["allow-lan", "external-controller", "log-level", "mode", "port", "proxies", "proxy-groups", "rules", "socks-port"],
+  "ignored_metadata_top_level_keys": ["allow-lan", "external-controller", "log-level", "mode", "port", "socks-port"],
+  "ignored_metadata_types": {
+    "allow-lan": "BOOL",
+    "external-controller": "STRING",
+    "log-level": "STRING",
+    "mode": "STRING",
+    "port": "INT",
+    "socks-port": "INT"
+  },
+  "ignored_metadata_semantic_sha256": "c2e9138fa9f86f341a9a71ec17881e3dc50649766773f0eb5c8cb1abc77b8a5e",
+  "source_uri_count": {"minimum": 110, "maximum": 110, "baseline": 110},
+  "converted_proxy_count": {"minimum": 108, "maximum": 108, "baseline": 108},
+  "converted_group_count": {"minimum": 13, "maximum": 13, "baseline": 13},
+  "converted_rule_count": {"minimum": 10231, "maximum": 10231, "baseline": 10231},
+  "converted_dns_present": false,
+  "converted_udp_absent_count": {"minimum": 0, "maximum": 108, "baseline": 108},
+  "converted_udp_true_count": {"minimum": 0, "maximum": 108, "baseline": 0},
+  "converted_udp_false_count": {"minimum": 0, "maximum": 0, "baseline": 0},
+  "normalized_udp_true_count": {"minimum": 108, "maximum": 108, "baseline": 108},
+  "normalized_tfo_false_count": {"minimum": 108, "maximum": 108, "baseline": 108}
+}

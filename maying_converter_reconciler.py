@@ -120,7 +120,11 @@ class MayingConverterNameAuthorityReconciler:
                 "credential_binding_validated": decision == "PASS",
                 "metadata_binding_validated": False,
                 "tfo_forced_false_count": len(normalized) if decision == "PASS" else 0,
+                "tfo_false_enforced_count": len(normalized) if decision == "PASS" else 0,
+                "udp_policy_validated": decision == "PASS",
                 "udp_true_validated_count": len(normalized) if decision == "PASS" else 0,
+                "source_udp_capability_declared": False,
+                "runtime_udp_capability_verified": False,
                 "credential_fields_emitted": False, "conversion_execution_authorized": False,
                 "candidate_build_authorized": False, "production_write_authorized": False,
             }
@@ -145,7 +149,9 @@ class MayingConverterNameAuthorityReconciler:
             "normalized_identity_set_sha256": MayingNormalizer()._identity_set_digest([]),
             "converter_name_authority_applied": False, "credential_binding_validated": False,
             "metadata_binding_validated": False, "tfo_forced_false_count": 0,
-            "udp_true_validated_count": 0, "credential_fields_emitted": False,
+            "tfo_false_enforced_count": 0, "udp_policy_validated": False,
+            "udp_true_validated_count": 0, "source_udp_capability_declared": False,
+            "runtime_udp_capability_verified": False, "credential_fields_emitted": False,
             "conversion_execution_authorized": False, "candidate_build_authorized": False,
             "production_write_authorized": False,
         }

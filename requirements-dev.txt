@@ -1,0 +1,8 @@
+# CI/security tooling only; runtime checks use vendor/pyyaml-6.0.2.
+# Install the hash-locked runtime requirements separately before these tools.
+# The scripts do not auto-install tools. Dependency advisory lookup is opt-in.
+PyYAML==6.0.2
+bandit==1.9.4
+pip-audit==2.10.1
+ruff==0.16.3
+shellcheck-py==0.11.0.1

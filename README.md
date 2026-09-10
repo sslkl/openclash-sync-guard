@@ -1,69 +1,133 @@
 # OpenClash Sync Guard
 
-[简体中文](README.zh-CN.md) · [Deployment guide](docs/DEPLOYMENT.md) · [Security policy](SECURITY.md)
+[简体中文](README.zh-CN.md) · [Deployment](docs/DEPLOYMENT.md) · [中文使用指南](docs/USER-GUIDE.zh-CN.md) · [AI maintenance](docs/AI-HANDOFF.md) · [Validation record](docs/VALIDATION-2026-09-09.md) · [Security](SECURITY.md)
 
-OpenClash Sync Guard is an opinionated, fail-closed toolkit for normalizing a subscription, building a per-router OpenClash candidate, and exposing an optional Chinese operations console. Its safe default is **prepare only**: a successful run writes a Candidate and receipts, but does not change the active configuration, UCI, the scheduler, or the OpenClash service.
+A fail-closed toolkit for normalizing subscription data, preparing per-router OpenClash Candidates, and operating an optional Chinese web console.
 
-> This is infrastructure software, not a universal one-click installer. Read the deployment gates, render your own topology, and inspect every generated file before running a root script.
+**The stage CLI prepares Candidates only. The extended web console is a separate privileged interface: approved actions can replace configuration files and, for some operations, restart OpenClash.** Do not treat every web action as stage-only.
 
-## What it provides
+> **2026-09-10 candidate: final source/public regressions and scoped production checks PASS; GUI acceptance and GitHub publication remain pending.** Deployment comparison, read-only HTTP, converter/native and backup checks passed within their recorded scope.
+>
+> **Regression evidence:** final Web Python runs passed 904 tests each for the source (`source-comprehensive-final03`) and public copy (`public-comprehensive-final02`). Required public offline checks passed; that offline entry still records `REAL_RUNTIME_SHAPE=NOT_RUN` and `NATIVE_PARSER_PROBES=NOT_RUN`.
+>
+> **Limits:** authenticated production GUI and real macOS appearance switching remain PENDING. The Mac is unlocked and the signed-in page has been observed, but interactive acceptance is incomplete while Safari is also in use by the operator. Real system appearance switching has not been performed. Write-check is `SKIPPED`; `restore_drill=NOT_RUN`. Offline Chromium 43/43 is not production GUI acceptance.
+>
+> **Security evidence:** `public-security-final03` remains `PASS_WITH_SKIPS`: 0 HIGH, 15 reviewed MEDIUM and 254 retained LOW; its embedded dependency query is skipped. A separate advisory query found no known vulnerabilities for pinned PyYAML 6.0.2 only, with two generic warnings retained. Reviewed findings and a clean advisory result are not zero-risk guarantees.
+>
+> **Release evidence:** Refer to the delivery receipt for local sealing IDs and gate results; they are not predeclared here. GitHub push/PR/remote readback remain incomplete; no GitHub write has occurred. See the [validation record](docs/VALIDATION-2026-09-09.md) for evidence scopes and remaining gates.
 
-- A memory-only Python worker that pins the subscription host, rejects redirects and schema drift, and emits a redacted receipt.
-- A Ruby Candidate builder with safe YAML loading, structural budgets, closed group/rule checks, DNS handling for hostnames and IP literals, and `HOLD` on drift.
-- Separate keys and Candidates for two routers, with serial rollout guidance.
-- An optional Chinese web console with Digest SHA-256 authentication, bounded request parsing, a root-owned helper, and forced-command router agents.
-- A strict TOML renderer that replaces only documented example topology values and refuses to overwrite an existing output directory.
+## Components
 
-```mermaid
-flowchart LR
-  S["Subscription source"] --> W["Worker and local converter"]
-  W --> N["Normalized YAML plus redacted receipt"]
-  N --> B["Router Candidate builder"]
-  B --> C["Per-router Candidate and checks"]
-  C --> G["Manual review and separate activation gate"]
-  UI["Optional Chinese web console"] --> H["Root-owned helper"]
-  H --> A["Forced-command router agents"]
+- A subscription worker and local converter with source-host pinning, bounded parsing, normalization contracts, and redacted receipts.
+- A router Candidate builder with safe YAML loading, structural limits, base-owned rules/DNS, explicit UDP provenance, and fail-closed drift/conflict checks.
+- Independent target identities and Candidates for two routers; review target A before proceeding to target B.
+- A Chinese console for quick updates, routing/Fake-IP customization, single-layer chain proxies, configuration viewing/editing, recovery, and subscription conversion.
+- Digest SHA-256 authentication, exact Host/Origin and client-network gates, fixed privileged-helper actions, per-router forced commands, and transaction checks.
+- A closed-schema TOML renderer that produces a new private deployment copy rather than editing the public source in place.
+
+```text
+default stage CLI: source → worker → per-router Candidate → review gate
+optional web:     browser → web service → fixed helper → router agent → transaction
+conversion:       controlled online fetch → restricted offline executor → result/preview
 ```
 
-## Quick start: offline validation
+## Find your way around the console
 
-Run on a development Mac or Linux host; these commands do not contact a router or change a live service.
+Start with the native collapsible **three-step guide**: read both targets → choose a function → check before confirming. Numbered navigation and layered help distinguish reading, preview/checking, writing, and restarting; color alone is not a risk indicator. At viewport widths of **600px or less**, navigation uses two columns.
+
+| No. | On-screen label | Purpose / key boundary |
+| --- | --- | --- |
+| 01 | 快速更新 | Update subscriptions and the main configuration; approved writes may restart OpenClash. |
+| 02 | 域名/IP 与 Fake-IP | Edit managed routing and Fake-IP entries; read, check, and confirm before saving. |
+| 03 | 链式代理 | Add an existing landing proxy to a supported node; apply, test, and cancel are separate actions. |
+| 04 | 配置浏览与修改 | Read, validate, and edit YAML; saving the main file does not activate it. |
+| 05 | 主配置回滚 | Restore a main file; this is neither chain cancellation nor proof of runtime recovery. |
+| 06 | 订阅转换 | Convert/export subscriptions; link generation, preview, and single-target apply are distinct. |
+
+- **Appearance follows the system:** The interface updates immediately when the browser's system light/dark preference changes, without refreshing, clearing drafts, submitting forms, or re-reading devices. The YAML editor intentionally stays dark in both themes.
+- **“本页读取于” is browser read-completion time:** it uses the browser's clock after a successful status read, not the server's sampling time or proof that the state is still fresh. A failed read shows “状态未确认”; re-read before writing.
+- **ACTIVE is a selected configuration path, not runtime/traffic acceptance.** For `UNKNOWN` or a lost write response, inspect current state and the receipt before retrying. The [Chinese user guide](docs/USER-GUIDE.zh-CN.md) explains each action's effects.
+
+## Public example topology
+
+These are RFC 5737 documentation values, **not reachable deployment instructions**. The public configuration does not identify an operator or a real provider.
+
+| Setting | Checked-in example |
+| --- | --- |
+| Target A | `router_a` at `192.0.2.10` |
+| Target B | `router_b` at `192.0.2.11` |
+| Worker / service account | `192.0.2.20` / `syncsvc` |
+| Main configuration | `ProviderBase-ProviderSource.yaml` |
+| Base / source | `ProviderBase.yaml` / `ProviderSource.yaml` |
+| Allowed client networks | `192.0.2.0/24,127.0.0.0/8` |
+
+Use [config.example.toml](config.example.toml) as the schema. Target IDs, hosts, and configuration roles must remain distinct. `expected_core_sha256` deliberately contains an invalid placeholder: supply the verified hash of your intended Mihomo binary, not an invented value or a web-runtime identity.
+
+## Start with offline checks
+
+Run on a development Mac or Linux workstation, in a **public-only source copy with no local configuration, credentials, rendered private output, or backups**. Use an unused environment path outside that checkout. Dependency installation may contact package indexes and needs its own network approval.
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
+python3 -m venv ../openclash-checks-venv
+. ../openclash-checks-venv/bin/activate
 python -m pip install -r openclash-sync-web/requirements.txt
 ./tools/run_offline_checks.sh
 ```
 
-Create a private local configuration. The example uses RFC 5737 documentation addresses and an intentionally invalid core hash.
+The supported baseline includes Python 3.12, the pinned PyYAML requirement, Ruby/Psych, and Node.js. Full verification also needs the applicable Lua, Mihomo, browser, and security tools; missing dependencies or skipped cases are not a full PASS. Tests may use temporary files and loopback listeners. See the [validation procedure](docs/VALIDATION-2026-09-09.md) for coverage and external-query boundaries.
+
+## Render a private deployment copy
+
+After public-source checks, create an ignored local configuration and edit it privately. Run the copy step only if `config.local.toml` does not already exist. Do not print or commit its values.
 
 ```sh
 cp config.example.toml config.local.toml
-# Edit every value. Never commit config.local.toml.
+# Edit and verify every field in config.local.toml before rendering.
 python3 tools/render_config.py config.local.toml --output build/rendered
 (cd build/rendered && sha256sum -c SHA256SUMS)
 ```
 
-On macOS, use `shasum -a 256 -c SHA256SUMS` for the last command. Rendering does not deploy or activate anything.
+On macOS use `shasum -a 256 -c SHA256SUMS` instead. The renderer refuses an existing output directory; choose a new destination rather than deleting old evidence. Once private inputs or output exist, do not run a whole-tree packaging/security scan over that directory without a separately approved read scope.
 
-## Supported assumptions
+The render workflow exports converter modules, the PNG logo, and all 19 vendored PyYAML files, including license/provenance. After topology substitution it **automatically refreshes runtime/sandbox and router/customizer pins in five consuming files**: server, helper, router install/update scripts, and the retention installer. It then produces `FILES` and `SHA256SUMS`. Current candidate synthetic rendering and independent byte/pin checks passed (`synthetic-render-final02`); local runtime verification passed 31/31 (`public-runtime-independent-final02`). These local-user checks do not establish production root ownership or ancestor-chain acceptance. Refer to the delivery receipt for local sealing IDs and gate results; recheck any later input changes. Each deployment also requires verification of its own rendered bytes, ownership and directory chain. A missing asset, stale binding, wrong owner/mode, or failed independent verification is a deployment HOLD; do not bypass pins or manually substitute a convenient hash. A checksum match is an integrity check, not a runtime or security acceptance result.
 
-- Worker: Python 3.12, PyYAML 6.0.2, a local converter on `127.0.0.1:25500`, OpenSSH, and optionally systemd for the web console.
-- Router: OpenWrt/ImmortalWrt with OpenClash, POSIX `sh`, Ruby/Psych, Lua with LuCI modules, `jsonfilter`, `flock`, `curl`, and Dropbear tools.
-- The Candidate builder contains opinionated Maying/Nexitally group and filename rules. Adapt and test them before using another provider or ruleset.
-- The web console is plain HTTP. Bind it only to a trusted management network or use the included SSH tunnel. A reviewed TLS reverse proxy must set matching explicit `OPENCLASH_WEB_ALLOWED_HOSTS` and `OPENCLASH_WEB_ALLOWED_ORIGINS`; never solve an Origin error with a wildcard.
-- Installers require a single pinned Ed25519 host-key line, strict owner/mode checks, root-controlled directory chains, and byte-for-byte post-copy verification. A HOLD is drift evidence, not a prompt to delete or chmod blindly.
+Rendering neither connects to targets nor installs services. Continue with the [deployment gates](docs/DEPLOYMENT.md); do not execute unrendered example installers.
 
-## Safety boundary
+**Disabled legacy entry:** `deploy_worker_lan_access.sh` is a no-side-effect compatibility stub returning `HOLD=LEGACY_LAN_MIGRATOR_DISABLED` and exit `64`. It is excluded from the renderer's operational allowlist and must not be re-pinned to bypass the full updater. Use only `install_worker_web_console.sh` / `update_worker_web_console.sh` for the worker console.
 
-`ROUTER_STAGE=PASS` means only that a Candidate was generated, hashed, and accepted by the local Mihomo syntax check. It is not evidence of production traffic, runtime health, or authorization to activate. This repository intentionally contains no automatic Candidate activation workflow.
+## Operational boundaries
 
-Never commit subscription URLs, raw YAML, passwords, HA1 files, private keys, `known_hosts`, cookies, tokens, or real topology files. See [SECURITY.md](SECURITY.md) and the [detailed deployment gates](docs/DEPLOYMENT.md).
+| Layer | What a result can establish | What it cannot establish |
+| --- | --- | --- |
+| Stage CLI | Candidate/receipt consistency and the stated Mihomo syntax check | Active configuration, traffic health, or permission to activate |
+| Web preview | A plan bound to current inputs and target baseline | A completed write or permission for unrelated actions |
+| Transaction receipt | The recorded target-local write/recovery result | Cross-router atomicity or independent live traffic health |
+| `no_change=true` | No configuration write/restart for that operation | Runtime health or successful end-to-end traffic |
+| GUI/synthetic tests | The particular interaction cases actually exercised | An authenticated live browser session or every browser/device |
 
-## Audit status
+- `ROUTER_STAGE=PASS` does not authorize activation. Source, Candidate, main file, ACTIVE/UCI selection, runtime, and traffic are separate layers.
+- Two-target writes are serial, not a distributed transaction. A failure on B does not prove A was untouched or automatically rolled back.
+- Preview proofs and compare-and-swap (CAS) baselines expire after input changes, drift, or authentication loss. Re-read and re-preview; do not force an overwrite.
+- After `UNKNOWN` or a lost write response, inspect the target and receipt before retrying. A request may already have committed.
+- Manual main-file save and main-file rollback are static-file operations, without automatic reload/restart. Recovery reapplies current customizations; it is not an implicit chain-proxy cancellation.
 
-The initial public release was reviewed on 2026-08-16 with 129 local non-listener tests and a 135-test GitHub Actions gate that includes six loopback HTTP/Digest tests. ShellCheck, Bandit, pip-audit, Lua parsing, manifest verification, and a sensitive-data scan also passed. The release tag is applied only after the exact tag target passes the full workflow. See the [sanitized audit report](docs/SECURITY-AUDIT-2026-08-16.md). This is not a formal third-party penetration test.
+## Security and feature limits
+
+**Digest over HTTP does not encrypt request or response bodies.** Subscriptions, proxy passwords, tokens, and configuration contents remain sensitive in transit. Restrict management access and use a reviewed TLS endpoint or an explicitly approved existing encrypted tunnel where confidentiality is needed. Digest, CIDR filtering, exact Host/Origin allowlists, and one-time write authorization serve different purposes; none replaces encryption. Legacy MD5 is an explicit compatibility/security exception, not the default.
+
+- Render `allowed_networks` offline as normalized IPv4 networks. Default routes, unsafe/reserved networks, duplicate entries, and missing loopback or worker coverage are rejected; so are `service_user=root` and an all-zero core digest. Keep the exact configured network-set check and explicit Host/Origin checks; never work around a 403 with wildcards, broader networks, or disabled certificate validation. This workflow does not change WAN exposure or firewall rules.
+- Chain proxies require an existing landing proxy and supported static nodes. They are single-layer; probes do not certify every site, UDP, or a residential/provider identity. Passwords are not echoed, but operational configurations and protected backups necessarily contain required credentials.
+- Conversion separates controlled online fetching from a network-disabled executor. Link generation is not fetching; a custom backend URL is not permission to access an arbitrary backend. Apply uses a fresh, single-target, baseline-bound preview and conservative merge rules.
+- Short links, Gist, client import, credential/clipboard access, and other external actions require explicit recipient/data/action authorization. A read-only third-party request can still disclose sensitive data. A secret Gist is not access control.
+- Never include real configuration, subscription URLs, HA1 files, private keys, tokens, cookies, private backups, or rendered topology in a public release. See [SECURITY.md](SECURITY.md).
+
+## Documentation and status
+
+- [Deployment gates](docs/DEPLOYMENT.md) / [中文部署](docs/DEPLOYMENT.zh-CN.md)
+- [中文用户指南](docs/USER-GUIDE.zh-CN.md): action effects, confirmation, chaining, conversion, and recovery
+- [AI maintenance guide](docs/AI-HANDOFF.md): permissions, code boundaries, digest binding, and evidence discipline
+- [Current validation record](docs/VALIDATION-2026-09-09.md): current scope and unverified layers
+- [Changelog](CHANGELOG.md) and [historical sanitized audit](docs/SECURITY-AUDIT-2026-08-16.md); historical findings are not current-copy acceptance
 
 ## License
 

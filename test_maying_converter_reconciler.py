@@ -53,6 +53,10 @@ def _():
     assert r["collision_group_count"] == 1 and r["collision_record_count"] == 2
     assert r["omitted_collision_identity_count"] == 1 and r["singleton_identity_count"] == 1
     assert r["credential_binding_validated"] is True and r["metadata_binding_validated"] is False
+    assert r["udp_policy_validated"] is True and r["udp_true_validated_count"] == 1
+    assert r["tfo_false_enforced_count"] == 1
+    assert r["source_udp_capability_declared"] is False
+    assert r["runtime_udp_capability_verified"] is False
     assert len(result.normalized_proxies) == 1 and result.normalized_proxies[0]["name"] == "🇭🇰 Renamed B"
     assert result.normalized_proxies[0]["tfo"] is False
 

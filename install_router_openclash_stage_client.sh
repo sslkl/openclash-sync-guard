@@ -19,13 +19,14 @@ case "$source_dir" in /*) ;; *) hold SOURCE_DIR 13;; esac
 [ "$(awk 'NR==1 {print $2}' "$hostkey_file")" = ssh-ed25519 ] || hold HOSTKEY_TYPE 16
 hostkey_data=$(awk 'NR==1 {print $3}' "$hostkey_file")
 case "$hostkey_data" in ''|*[!A-Za-z0-9+/=]*) hold HOSTKEY_FORMAT 16;; esac
-for file in openclash_router_stage_builder.rb openclash_router_stage_client.sh; do
+for file in openclash_router_stage_builder.rb openclash_router_stage_client.sh router-openclash-sync-capability-audit.sh; do
   [ -f "$source_dir/$file" ] && [ ! -L "$source_dir/$file" ] || hold SOURCE_ASSET 18
 done
 command -v dropbearkey >/dev/null 2>&1 || hold DROPBEARKEY 19
 command -v ruby >/dev/null 2>&1 || hold RUBY 20
 command -v lua >/dev/null 2>&1 || hold LUA 21
 command -v jsonfilter >/dev/null 2>&1 || hold JSONFILTER 22
+command -v cmp >/dev/null 2>&1 || hold CMP 22
 
 root=/etc/openclash/publisher-v4
 ssh_dir=/root/.ssh
@@ -57,8 +58,9 @@ mkdir -p "$root/bin" "$root/keys" "$root/stage"
 chmod 0700 "$root" "$root/bin" "$root/keys" "$root/stage"
 cp "$source_dir/openclash_router_stage_builder.rb" "$root/bin/openclash_router_stage_builder.rb"
 cp "$source_dir/openclash_router_stage_client.sh" "$root/bin/openclash_router_stage_client.sh"
+cp "$source_dir/router-openclash-sync-capability-audit.sh" "$root/bin/router-openclash-sync-capability-audit.sh"
 cp "$hostkey_file" "$ssh_dir/known_hosts"
-chmod 0500 "$root/bin/openclash_router_stage_builder.rb" "$root/bin/openclash_router_stage_client.sh"
+chmod 0500 "$root/bin/openclash_router_stage_builder.rb" "$root/bin/openclash_router_stage_client.sh" "$root/bin/router-openclash-sync-capability-audit.sh"
 chmod 0600 "$ssh_dir/known_hosts"
 chmod 0700 "$ssh_dir"
 
@@ -70,7 +72,11 @@ chmod 0644 "$root/keys/sync-worker-ed25519.pub"
 [ "$(wc -l <"$root/keys/sync-worker-ed25519.pub" | tr -d ' ')" -eq 1 ] || hold PUBLIC_KEY 31
 
 /bin/sh -n "$root/bin/openclash_router_stage_client.sh" || hold CLIENT_SYNTAX 32
+/bin/sh -n "$root/bin/router-openclash-sync-capability-audit.sh" || hold AUDIT_SYNTAX 32
 ruby -c "$root/bin/openclash_router_stage_builder.rb" >/dev/null || hold BUILDER_SYNTAX 33
+for file in openclash_router_stage_builder.rb openclash_router_stage_client.sh router-openclash-sync-capability-audit.sh; do
+  cmp -s "$source_dir/$file" "$root/bin/$file" || hold COPIED_BYTES 33
+done
 for path in "$root" "$root/bin" "$root/keys" "$root/stage" "$ssh_dir"; do
   [ "$(ls -ldn "$path" | awk '{print $1 ":" $3 ":" $4}')" = 'drwx------:0:0' ] || hold DIRECTORY_MODE 34
 done

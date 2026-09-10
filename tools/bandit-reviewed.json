@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "reviewed": [
+    {
+      "path": "openclash-sync-web/converter_formats.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "2135171942e723b3ee3adc2dd0cdcbc26ddcdb7d0f9dd70263e43e66ac7f1849",
+      "count": 1,
+      "reason": "UniqueLoader inherits BoundedSafeLoader and yaml.SafeLoader, not the unsafe Loader. Parsing rejects anchors, aliases, duplicate/non-text keys and merge keys, enforces token/node/depth budgets, and validates scalar shapes. Regression tests cover unsafe YAML tags and resource limits."
+    },
+    {
+      "path": "openclash-sync-web/converter_runtime_bundle.py",
+      "rule": "B103",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "476a9d91d78eb57a7bc18da0a031c5dcedda97d882688d23f73168d7fac9dc43",
+      "count": 1,
+      "reason": "The descriptor refers to an already trusted, non-symlink public code directory. Owner, inode and absence of group/other write bits are checked before fchmod. Mode 0755 only permits traversal/read of immutable code; secrets are never installed here and production ownership is root-only."
+    },
+    {
+      "path": "openclash-sync-web/converter_sandbox.py",
+      "rule": "B108",
+      "severity": "MEDIUM",
+      "confidence": "MEDIUM",
+      "context_sha256": "8ad78b9eb57e8d5caf46275bf3f7b9e18fb5ba2136c9907b183a3f5d58d0444a",
+      "count": 1,
+      "reason": "This /tmp is a new 4 MiB tmpfs inside a disposable, network-isolated, non-root Docker container, not a host path or bind mount. The container is read-only, drops all capabilities, forbids new privileges and applies noexec/nosuid/nodev, resource limits and bounded output."
+    },
+    {
+      "path": "openclash-sync-web/server.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "1d946b35a0eb3325b2e94d89dab4e49daf80c16a392558e26bfeb87e04311ed6",
+      "count": 1,
+      "reason": "StrictSafeLoader inherits the same bounded yaml.SafeLoader subclass as the converter, with token/node/depth limits and duplicate/non-text key rejection. UTF-8 and input-size limits precede parsing; unsafe tags, aliases and anchors are rejected. The scanner warning is about the generic yaml.load API name."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_chain_server.py",
+      "rule": "B104",
+      "severity": "MEDIUM",
+      "confidence": "MEDIUM",
+      "context_sha256": "4cb59bc269303db5e7fd61c9ce98816c669e4651cbf43358b2047a89ba1bcd6c",
+      "count": 1,
+      "reason": "The wildcard address is a literal in a synthetic invalid-input list. The test calls the chain validator and requires rejection without echoing values; it never binds a listening socket or connects to this address."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_converter_execution.py",
+      "rule": "B104",
+      "severity": "MEDIUM",
+      "confidence": "MEDIUM",
+      "context_sha256": "03d20218e5eb88bf2b8f1fa79e9f09651eabb6340b645fe12729707ebe52657c",
+      "count": 1,
+      "reason": "The wildcard and reserved addresses are synthetic denial fixtures for public_ip. Every member must raise ConverterError before any network operation. The test performs no listener bind or connection to these addresses."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_converter_runtime_bundle.py",
+      "rule": "B102",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "72bd255eb3dc89a73fe27fbd7f114b108eaac8ab584372ed7851214088631f88",
+      "count": 1,
+      "reason": "The test compiles a fixed preflight block extracted from the repository installer, not from request or external input. It substitutes the production path with a temporary fixture, mocks owner metadata and argv, and proves only the traversable ancestor mode is accepted. No install or service operation is executed."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_converter_runtime_bundle.py",
+      "rule": "B102",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "ac2486c5c9942d17dbf7ab811f16c1338aa815d9f5820a0bb7527a1b39daf31c",
+      "count": 1,
+      "reason": "The test executes the same repository-owned preflight block against temporary fixtures to require rejection of inaccessible ancestor permissions. Production paths are replaced and owner metadata is mocked. This is bounded regression execution of trusted source, not an application eval/exec input path."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_worker_web_deploy_security.py",
+      "rule": "B103",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "15fb11e37ef5c7d616e281fd8f41964f528be1abc6f83d66ef60357f8a96b240",
+      "count": 1,
+      "reason": "The test intentionally makes a temporary synthetic source file group-writable so the staging helper must reject it. It never changes production assets or installs the insecure mode; the fixture is isolated in TemporaryDirectory."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_worker_web_deploy_security.py",
+      "rule": "B103",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "17152e62a913d609b1a777c405d041543c54689308b202a4efcad98db4898bc7",
+      "count": 1,
+      "reason": "The test intentionally sets a temporary fixture root to non-private permissions and requires the source stager to fail closed. This is a negative permission test, not a production permission change."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_yaml_bounded.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "cd26815af9d383ff58e93a0e840ba9c535925c54cf3432369d4ddd715dc31527",
+      "count": 1,
+      "reason": "Tiny subclasses the bounded SafeLoader-based UniqueLoader with a three-token budget. The literal synthetic document is expected to raise YAMLError during parsing; no arbitrary YAML constructor is enabled."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_yaml_bounded.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "9638fdf5ec719f341ef757bb459ca9e99ab2ed6e926b3da85d1141b7d63dba29",
+      "count": 1,
+      "reason": "Tiny subclasses the bounded SafeLoader-based UniqueLoader with a three-node limit. This exact literal verifies the allowed boundary and contains only scalar mappings; it does not use yaml.Loader or external input."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_yaml_bounded.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "ee40c032e2f7c10b4e6db3cbd97654a4091d949403592d1e5ce3161eac755515",
+      "count": 1,
+      "reason": "Tiny subclasses the bounded SafeLoader-based UniqueLoader. This exact synthetic mapping exceeds its three-node limit and must raise YAMLError, validating fail-closed parsing rather than allowing an unsafe constructor."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_yaml_bounded.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "112039fc243120093bbf519e434abda3e693704ca0a2fe98edfd32765b4e3313",
+      "count": 1,
+      "reason": "Tiny subclasses the bounded SafeLoader-based UniqueLoader with depth three. The fixed literal checks the accepted nesting boundary; the SafeLoader constructor set remains unchanged."
+    },
+    {
+      "path": "openclash-sync-web/tests/test_yaml_bounded.py",
+      "rule": "B506",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "context_sha256": "9713f14bd357813909c16e7074eb714c13b39a8ad5d2fc4fa84730ce6262a5d1",
+      "count": 1,
+      "reason": "Tiny subclasses the bounded SafeLoader-based UniqueLoader with depth three. The fixed over-depth literal must raise YAMLError before unbounded composition; it is an intentional parser rejection regression."
+    }
+  ]
+}

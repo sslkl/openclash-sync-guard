@@ -13,8 +13,9 @@ Environment=OPENCLASH_WEB_PORT=8088
 Environment=OPENCLASH_WEB_HELPER=/usr/local/sbin/openclash-web-helper
 Environment=OPENCLASH_WEB_AUTH_USER=openclash-admin
 Environment=OPENCLASH_WEB_AUTH_HA1_FILE=/opt/openclash-sync-web/auth-ha1
-Environment=OPENCLASH_WEB_ALLOWED_HOSTS=192.0.2.20:8088,127.0.0.1:18088
-Environment=OPENCLASH_WEB_ALLOWED_ORIGINS=http://192.0.2.20:8088,http://127.0.0.1:18088
+Environment=OPENCLASH_WEB_PYYAML_ROOT=/opt/publisher-v4-openclash-worker/vendor/pyyaml-6.0.2
+Environment=OPENCLASH_WEB_ALLOWED_HOSTS=192.0.2.20:8088
+Environment=OPENCLASH_WEB_ALLOWED_ORIGINS=http://192.0.2.20:8088
 Environment=OPENCLASH_WEB_ALLOWED_NETWORKS=192.0.2.0/24,127.0.0.0/8
 ExecStart=/usr/bin/python3 /opt/openclash-sync-web/server.py
 Restart=on-failure

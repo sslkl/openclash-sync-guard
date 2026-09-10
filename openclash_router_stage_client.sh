@@ -89,7 +89,12 @@ io.write(json.stringify({schema="publisher-v4-worker-request-v1",address=address
 LUA
 then
   [ ! -s "$maying_tmp" ] || hold WORKER_PARTIAL_OUTPUT 30
-  hold WORKER 31
+  worker_reason=$(jsonfilter -i "$receipt" -e '@.reason' 2>/dev/null || true)
+  case "$worker_reason" in
+    REQUEST|REQUEST_SCHEMA|SOURCE_DRIFT|CONVERTED_YAML|MAYING_DOCUMENT_SHAPE|MAYING_DNS_UNEXPECTED|MAYING_SOURCE_CONTRACT|CONVERTER_UDP_FALSE|CONVERTER_UDP_TYPE|UDP_COUNT_MISMATCH|CONTRACT|NORMALIZATION|NORMALIZATION_POLICY|NORMALIZED_YAML|NETWORK|INTERNAL) ;;
+    *) worker_reason=INTERNAL ;;
+  esac
+  hold "WORKER_$worker_reason" 31
 fi
 chmod 0600 "$maying_tmp" "$receipt"
 [ -s "$maying_tmp" ] && [ -s "$receipt" ] || hold WORKER_OUTPUT 32
@@ -97,9 +102,16 @@ decision=$(jsonfilter -i "$receipt" -e '@.decision' 2>/dev/null || true)
 reason=$(jsonfilter -i "$receipt" -e '@.reason' 2>/dev/null || true)
 count=$(jsonfilter -i "$receipt" -e '@.normalization.output_proxy_count' 2>/dev/null || true)
 yaml_sha=$(jsonfilter -i "$receipt" -e '@.normalized_yaml_sha256' 2>/dev/null || true)
+source_format=$(jsonfilter -i "$receipt" -e '@.normalization.source_format' 2>/dev/null || true)
+udp_true_count=$(jsonfilter -i "$receipt" -e '@.normalized_udp_true_count' 2>/dev/null || true)
+dns_present=$(jsonfilter -i "$receipt" -e '@.converter_dns_present' 2>/dev/null || true)
 [ "$decision" = PASS ] && [ "$reason" = NONE ] || hold WORKER_DECISION 33
 case "$count" in ''|*[!0-9]*) hold WORKER_COUNT 34;; esac
 [ "$count" -ge 1 ] && [ "$count" -le 2048 ] || hold WORKER_COUNT 34
+[ "$source_format" = BASE64_SSR_URI_LIST ] || hold WORKER_MAYING_SOURCE_CONTRACT 34
+case "$udp_true_count" in ''|*[!0-9]*) hold WORKER_UDP_COUNT_MISMATCH 34;; esac
+[ "$udp_true_count" -eq "$count" ] || hold WORKER_UDP_COUNT_MISMATCH 34
+[ "$dns_present" = false ] || hold WORKER_MAYING_DNS_UNEXPECTED 34
 [ "$(sha256sum "$maying_tmp" | awk '{print $1}')" = "$yaml_sha" ] || hold WORKER_HASH 35
 
 mv "$maying_tmp" "$maying"
@@ -112,7 +124,7 @@ if ! ruby "$builder" /etc/openclash/config/ProviderBase.yaml "$maying" \
   builder_reason=$(sed -n 's/^ROUTER_STAGE_BUILD=HOLD|REASON=\([A-Z0-9_-][A-Z0-9_-]*\)$/\1/p' "$builder_error" || true)
   builder_lines=$(wc -l <"$builder_error" | tr -d ' ')
   case "$builder_reason" in
-    ARGS|EXPECTED_COUNT|INPUT_PATH|OUTPUT_PATH|OUTPUT_EXISTS|YAML_SIZE|YAML_ALIAS|YAML_BUDGET|YAML_ROOT|BASE_ROOT|MAYING_ROOT|RUNTIME_ROOT|BASE_DNS|PROXIES_TYPE|PROXY-GROUPS_TYPE|RULES_TYPE|BASE_PROXY|BASE_GROUP|MAYING_PROXY|MAYING_GROUP|MAYING_COUNT|MAYING_TYPE|NODE_COLLISION|RUNTIME_PROXY|RUNTIME_GROUP|SUPPLEMENT_COUNT|SUPPLEMENT_TYPE|RUNTIME_PROXY_ROTATION|RUNTIME_GROUP_ROTATION|RUNTIME_GROUP_MISSING|RUNTIME_GROUP_REMOVAL|RUNTIME_GROUP_ADDITION|RUNTIME_MANAGED_REGION|REGION_COLLISION|REGION_MISSING|REGION_EMPTY|REGION_MEMBER|REGION_PARTITION|REGION_GROUP_SHAPE|REGION_NAME_AMBIGUOUS|BUSINESS_GROUP|BUSINESS_DUPLICATE|DNS_POLICY_EXISTS|DNS_HOSTS|CANDIDATE_PROXY|CANDIDATE_GROUP|BASE_PROXY_DRIFT|RULE_DRIFT|GROUP_REFERENCE|GROUP_CYCLE|CANDIDATE_SIZE|INTERNAL) ;;
+    ARGS|EXPECTED_COUNT|INPUT_PATH|OUTPUT_PATH|OUTPUT_EXISTS|YAML_SIZE|YAML_ALIAS|YAML_CLASS|YAML_SYNTAX|YAML_PARSE|YAML_BUDGET|YAML_ROOT|BASE_ROOT|MAYING_ROOT|RUNTIME_ROOT|BASE_DNS|PROXIES_TYPE|PROXY-GROUPS_TYPE|RULES_TYPE|BASE_PROXY|BASE_GROUP|MAYING_PROXY|MAYING_GROUP|MAYING_COUNT|MAYING_TYPE|MAYING_DOCUMENT_SHAPE|MAYING_DNS_UNEXPECTED|MAYING_RULES_UNEXPECTED|NODE_COLLISION|RUNTIME_PROXY|RUNTIME_GROUP|SUPPLEMENT_COUNT|SUPPLEMENT_TYPE|RUNTIME_PROXY_ROTATION|RUNTIME_GROUP_ROTATION|RUNTIME_GROUP_MISSING|RUNTIME_GROUP_REMOVAL|RUNTIME_GROUP_ADDITION|RUNTIME_MANAGED_REGION|REGION_COLLISION|REGION_MISSING|REGION_EMPTY|REGION_MEMBER|REGION_PARTITION|REGION_GROUP_SHAPE|REGION_NAME_AMBIGUOUS|BUSINESS_GROUP|BUSINESS_DUPLICATE|DNS_POLICY_COLLISION|DNS_OWNERSHIP_DRIFT|DNS_HOSTS|CANDIDATE_PROXY|CANDIDATE_GROUP|BASE_PROXY_DRIFT|RULE_DRIFT|GROUP_REFERENCE|GROUP_CYCLE|CANDIDATE_SIZE|INTERNAL) ;;
     *) builder_reason=INTERNAL ;;
   esac
   [ "$builder_lines" -eq 1 ] || builder_reason=INTERNAL
@@ -127,6 +139,24 @@ if [ -s "$builder_error" ]; then
 fi
 rm -f "$builder_error"
 chmod 0600 "$candidate" "$stage/builder-receipt.yaml"
+base_dns_sha=$(awk '$1 == "base_dns_sha256:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+candidate_dns_sha=$(awk '$1 == "candidate_dns_sha256:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+builder_udp_count=$(awk '$1 == "maying_udp_true_count:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+builder_tfo_count=$(awk '$1 == "maying_tfo_false_count:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+builder_udp_runtime=$(awk '$1 == "maying_udp_runtime_verified:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+policy_host_count=$(awk '$1 == "maying_policy_host_count:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+policy_resolver_sha=$(awk '$1 == "maying_policy_resolver_set_sha256:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+builder_candidate_sha=$(awk '$1 == "candidate_sha256:" && NF == 2 {print $2}' "$stage/builder-receipt.yaml")
+for digest in "$base_dns_sha" "$candidate_dns_sha" "$policy_resolver_sha" "$builder_candidate_sha"; do
+  case "$digest" in ''|*[!0-9a-f]*) hold BUILDER_DNS_OWNERSHIP_DRIFT 40;; esac
+  [ "${#digest}" -eq 64 ] || hold BUILDER_DNS_OWNERSHIP_DRIFT 40
+done
+case "$builder_udp_count" in ''|*[!0-9]*) hold BUILDER_UDP_COUNT_MISMATCH 40;; esac
+case "$builder_tfo_count" in ''|*[!0-9]*) hold BUILDER_UDP_COUNT_MISMATCH 40;; esac
+case "$policy_host_count" in ''|*[!0-9]*) hold BUILDER_DNS_OWNERSHIP_DRIFT 40;; esac
+[ "$builder_udp_count" -eq "$count" ] && [ "$builder_tfo_count" -eq "$count" ] || hold BUILDER_UDP_COUNT_MISMATCH 40
+[ "$policy_host_count" -le "$count" ] || hold BUILDER_DNS_OWNERSHIP_DRIFT 40
+[ "$builder_udp_runtime" = false ] || hold BUILDER_UDP_COUNT_MISMATCH 40
 printf '%s\n' 'BUILDER=PASS' >"$stage/builder-status"
 chmod 0600 "$stage/builder-status"
 if ! "$core" -t -d /etc/openclash -f "$candidate" >/dev/null 2>/dev/null; then
@@ -136,12 +166,20 @@ fi
 printf '%s\n' 'MIHOMO=PASS' >"$stage/mihomo-status"
 chmod 0600 "$stage/mihomo-status"
 candidate_sha=$(sha256sum "$candidate" | awk '{print $1}')
+[ "$candidate_sha" = "$builder_candidate_sha" ] || hold BUILDER_HASH 42
 printf '%s\n' \
   'ROUTER_STAGE=PASS' "TARGET=$target" "TRANSACTION=$transaction" \
-  "MAYING_PROXY_COUNT=$count" "CANDIDATE_SHA256=$candidate_sha" \
+  "MAYING_SOURCE_FORMAT=$source_format" "MAYING_PROXY_COUNT=$count" "MAYING_UDP_TRUE_COUNT=$udp_true_count" \
+  "MAYING_DNS_PRESENT=$dns_present" "BASE_DNS_SHA256=$base_dns_sha" "CANDIDATE_DNS_SHA256=$candidate_dns_sha" \
+  "MAYING_POLICY_HOST_COUNT=$policy_host_count" "MAYING_POLICY_RESOLVER_SET_SHA256=$policy_resolver_sha" \
+  "CANDIDATE_SHA256=$candidate_sha" \
   'ACTIVE_CHANGED=false' 'UCI_CHANGED=false' 'SERVICE_RESTARTED=false' \
   >"$stage/COMMITTED"
 chmod 0600 "$stage/COMMITTED"
 stage_committed=true
 trap - EXIT HUP INT TERM
-printf '%s\n' 'ROUTER_STAGE=PASS' "TARGET=$target" "MAYING_PROXY_COUNT=$count" "CANDIDATE_SHA256=$candidate_sha" 'ACTIVE_CHANGED=false' 'UCI_CHANGED=false' 'SERVICE_RESTARTED=false'
+printf '%s\n' 'ROUTER_STAGE=PASS' "TARGET=$target" "MAYING_SOURCE_FORMAT=$source_format" "MAYING_PROXY_COUNT=$count" \
+  "MAYING_UDP_TRUE_COUNT=$udp_true_count" "MAYING_DNS_PRESENT=$dns_present" \
+  "BASE_DNS_SHA256=$base_dns_sha" "CANDIDATE_DNS_SHA256=$candidate_dns_sha" "CANDIDATE_SHA256=$candidate_sha" \
+  "MAYING_POLICY_HOST_COUNT=$policy_host_count" "MAYING_POLICY_RESOLVER_SET_SHA256=$policy_resolver_sha" \
+  'ACTIVE_CHANGED=false' 'UCI_CHANGED=false' 'SERVICE_RESTARTED=false'

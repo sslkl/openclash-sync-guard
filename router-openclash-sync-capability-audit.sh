@@ -2,17 +2,33 @@
 set -eu
 
 audit=PASS
+root=/etc/openclash/publisher-v4
+bin=$root/bin
 
-printf 'RUBY_URI='
-if ruby -ruri -e 'exit URI.respond_to?(:decode_www_form)' >/dev/null 2>&1; then printf 'PASS\n'; else printf 'MISSING\n'; audit=HOLD; fi
-printf 'RUBY_JSON='
-if ruby -rjson -e 'exit JSON.respond_to?(:generate)' >/dev/null 2>&1; then printf 'PASS\n'; else printf 'MISSING\n'; audit=HOLD; fi
+asset_audit=PASS
+for file in openclash_router_stage_builder.rb openclash_router_stage_client.sh router-openclash-sync-capability-audit.sh; do
+  path=$bin/$file
+  if [ ! -f "$path" ] || [ -L "$path" ] || [ "$(ls -ln "$path" | awk '{print $1 ":" $3 ":" $4}')" != '-r-x------:0:0' ]; then
+    asset_audit=HOLD
+  fi
+done
+printf 'PUBLISHER_ASSETS=%s\n' "$asset_audit"
+[ "$asset_audit" = PASS ] || audit=HOLD
+
+contract_audit=PASS
+for marker in MAYING_DOCUMENT_SHAPE MAYING_DNS_UNEXPECTED MAYING_RULES_UNEXPECTED CONVERTER_UDP_FALSE CONVERTER_UDP_TYPE UDP_COUNT_MISMATCH DNS_OWNERSHIP_DRIFT DNS_POLICY_COLLISION BASE_DNS_SHA256 CANDIDATE_DNS_SHA256 BUILDER_HASH; do
+  grep -Fq "$marker" "$bin/openclash_router_stage_client.sh" || contract_audit=HOLD
+done
+printf 'SYNC_CONTRACT_MARKERS=%s\n' "$contract_audit"
+[ "$contract_audit" = PASS ] || audit=HOLD
+
 printf 'RUBY_YAML='
 if ruby -ryaml -e 'exit YAML.respond_to?(:safe_load)' >/dev/null 2>&1; then printf 'PASS\n'; else printf 'MISSING\n'; audit=HOLD; fi
-printf 'RUBY_IPADDR='
-if ruby -ripaddr -e 'exit IPAddr.new("192.0.2.1").ipv4?' >/dev/null 2>&1; then printf 'PASS\n'; else printf 'MISSING\n'; audit=HOLD; fi
+printf 'RUBY_DIGEST='
+if ruby -rdigest -e 'exit Digest::SHA256.hexdigest("contract").length == 64' >/dev/null 2>&1; then printf 'PASS\n'; else printf 'MISSING\n'; audit=HOLD; fi
+printf '%s\n' 'RUBY_DEPENDENCY_SET=YAML_DIGEST_ONLY'
 
-for command in curl sha256sum flock mktemp readlink; do
+for command in curl sha256sum flock mktemp readlink jsonfilter awk sed cmp; do
   label=$(printf '%s' "$command" | tr 'a-z' 'A-Z')
   printf 'TOOL_%s=' "$label"
   if command -v "$command" >/dev/null 2>&1; then printf 'PRESENT\n'; else printf 'MISSING\n'; audit=HOLD; fi

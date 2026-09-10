@@ -40,6 +40,8 @@ yarn-error.log*
 /outputs/
 /work/
 .auth-ha1
+.auth-ha1.next
 .web-login-secret
+.web-login-secret.next
 __pycache__/
 *.pyc

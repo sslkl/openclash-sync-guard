@@ -14,8 +14,11 @@ concurrency:
 
 jobs:
   offline-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHON: python3
+      OPENCLASH_TEST_LUA: lua5.1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -24,7 +27,9 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: openclash-sync-web/requirements.txt
+          cache-dependency-path: |
+            openclash-sync-web/requirements.txt
+            requirements-dev.txt
       - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1 (2026-07-22)
         with:
           ruby-version: '3.3'
@@ -32,7 +37,33 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
-      - name: Install Python dependency
-        run: python -m pip install --disable-pip-version-check -r openclash-sync-web/requirements.txt
-      - name: Run offline checks
+      - name: Install pinned Lua runtime on the disposable runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends lua5.1=5.1.5-9build2
+      - name: Install pinned Python security dependencies
+        run: |
+          # Do not mix the hash-locked runtime manifest with unhashed dev tools.
+          python -m pip install --disable-pip-version-check --require-hashes --no-deps -r openclash-sync-web/requirements.txt
+          python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - name: Download pinned Mihomo syntax checker
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 \
+            https://github.com/MetaCubeX/mihomo/releases/download/v1.19.30/mihomo-linux-amd64-v1.19.30.gz \
+            -o "$RUNNER_TEMP/mihomo.gz"
+          printf '%s  %s\n' 'cf06ce2c7d1421bdbda14ee4a5b6046672dc35ebf8eecd8e77504ec3c0ed9a84' "$RUNNER_TEMP/mihomo.gz" | sha256sum -c -
+          gzip -dc "$RUNNER_TEMP/mihomo.gz" > "$RUNNER_TEMP/mihomo"
+          chmod 0500 "$RUNNER_TEMP/mihomo"
+      - name: Run complete offline regressions and five-language syntax checks
+        env:
+          # Only the checksum-verified core and synthetic loopback fixtures are used.
+          OPENCLASH_TEST_MIHOMO: ${{ runner.temp }}/mihomo
+          # Mellow is deliberately unconfigured: its integration reports SKIP,
+          # and the aggregate must say PASS_WITH_SKIPS, not an all-tests PASS.
         run: ./tools/run_offline_checks.sh
+      - name: Run Mihomo synthetic Candidate check
+        run: ./tools/run_mihomo_syntax_check.sh "$RUNNER_TEMP/mihomo"
+      - name: Run static security checks and pinned dependency advisory audit
+        env:
+          RUN_DEPENDENCY_AUDIT: '1'
+        run: ./tools/run_security_checks.sh

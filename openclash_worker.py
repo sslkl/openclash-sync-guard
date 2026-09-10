@@ -10,14 +10,21 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Callable
+from pathlib import Path
 
+VENDORED_PYYAML_ROOT = Path(__file__).with_name("vendor") / "pyyaml-6.0.2"
+sys.path.insert(0, str(VENDORED_PYYAML_ROOT))
 import yaml
 from yaml.tokens import AliasToken, AnchorToken
 
-from maying_normalizer import MayingNormalizer
+if yaml.__version__ != "6.0.2":
+    raise RuntimeError("vendored PyYAML 6.0.2 required")
+
 from maying_converter_reconciler import MayingConverterNameAuthorityReconciler
+from maying_normalizer import MayingNormalizer
 
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_SOURCE_BYTES = MayingNormalizer.MAX_SOURCE_BYTES
@@ -27,6 +34,19 @@ REQUIRED_QUERY = {
     "fdn": "true", "list": "false", "scv": "false", "sort": "false",
 }
 ALLOWED_QUERY_KEYS = frozenset(("url", *REQUIRED_QUERY))
+SHAPE_CONTRACT_NAME = "maying-converter-shape-contract.json"
+COUNT_CONTRACT_KEYS = (
+    "source_uri_count", "converted_proxy_count", "converted_group_count", "converted_rule_count",
+    "converted_udp_absent_count", "converted_udp_true_count", "converted_udp_false_count",
+    "normalized_udp_true_count", "normalized_tfo_false_count",
+)
+
+
+class WorkerPolicyHold(Exception):
+    def __init__(self, reason: str, evidence: dict | None = None):
+        super().__init__(reason)
+        self.reason = reason
+        self.evidence = evidence or {}
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -44,11 +64,13 @@ class Worker:
     def __init__(self, *, allowed_outer_hosts=("192.0.2.20",), converter_origin="http://127.0.0.1:25500",
                  expected_source_host_sha256: str | None = None,
                  normalization_policy: str = "strict-v1",
+                 shape_contract: dict | None = None,
                  fetcher: Callable[[str, int, int], FetchResult] | None = None):
         self.allowed_outer_hosts = frozenset(allowed_outer_hosts)
         self.converter_origin = converter_origin
         self.expected_source_host_sha256 = expected_source_host_sha256
         self.normalization_policy = normalization_policy
+        self.shape_contract = shape_contract
         self.fetcher = fetcher or self._fetch
 
     def run(self, request_bytes: bytes) -> dict:
@@ -61,7 +83,7 @@ class Worker:
             if request.get("schema") != "publisher-v4-worker-request-v1":
                 return self._hold("REQUEST_SCHEMA")
             address = request.get("address")
-            parsed, query, source_url = self._validate_address(address)
+            _parsed, query, source_url = self._validate_address(address)
             source_before = self.fetcher(source_url, MAX_SOURCE_BYTES, 20).body
             converter_query = urllib.parse.urlencode(query, doseq=True, safe="")
             converter_url = f"{self.converter_origin}/sub?{converter_query}"
@@ -72,7 +94,13 @@ class Worker:
             document = self._load_converted_yaml(converted)
             if not isinstance(document, dict) or not isinstance(document.get("proxies"), list) or not isinstance(document.get("proxy-groups"), list):
                 return self._hold("CONVERTED_YAML")
-            converted_proxies = self._materialize_converter_policy(document["proxies"])
+            contract = self._validated_shape_contract()
+            converter_evidence = self._validate_converter_document(document, contract)
+            converted_proxies, udp_evidence = self._materialize_converter_policy(document["proxies"])
+            converter_evidence.update(udp_evidence)
+            self._validate_count(contract, "converted_udp_absent_count", udp_evidence["converter_udp_absent_count"])
+            self._validate_count(contract, "converted_udp_true_count", udp_evidence["converter_udp_true_count"])
+            self._validate_count(contract, "converted_udp_false_count", udp_evidence["converter_udp_false_count"])
             if self.normalization_policy == "strict-v1":
                 normalized = MayingNormalizer().normalize(source_before, converted_proxies)
             elif self.normalization_policy == MayingConverterNameAuthorityReconciler.POLICY:
@@ -81,10 +109,25 @@ class Worker:
                 return self._hold("NORMALIZATION_POLICY")
             if normalized.receipt["decision"] != "PASS":
                 return self._hold("NORMALIZATION", normalization=normalized.receipt)
-            document["proxies"] = [dict(proxy) for proxy in normalized.normalized_proxies]
-            normalized_yaml = yaml.safe_dump(document, allow_unicode=True, sort_keys=False).encode("utf-8")
+            normalized_proxies = [dict(proxy) for proxy in normalized.normalized_proxies]
+            normalized_udp_true_count = sum(proxy.get("udp") is True for proxy in normalized_proxies)
+            normalized_tfo_false_count = sum(proxy.get("tfo") is False for proxy in normalized_proxies)
+            self._validate_normalized_contract(
+                contract, normalized.receipt, len(converted_proxies), normalized_udp_true_count,
+                normalized_tfo_false_count, udp_evidence,
+            )
+            normalized_document = {
+                "proxies": normalized_proxies,
+                "proxy-groups": deepcopy(document["proxy-groups"]),
+            }
+            normalized_yaml = yaml.safe_dump(normalized_document, allow_unicode=True, sort_keys=False).encode("utf-8")
             if not 1 <= len(normalized_yaml) <= MAX_CONVERTED_BYTES:
                 return self._hold("NORMALIZED_YAML")
+            converter_evidence.update({
+                "normalized_udp_true_count": normalized_udp_true_count,
+                "normalized_tfo_false_count": normalized_tfo_false_count,
+                "udp_policy": "request-bound-true-v1",
+            })
             return {
                 "schema": "publisher-v4-worker-response-v1",
                 "decision": "PASS", "reason": "NONE", "authorization_effect": "PREPARE_ONLY",
@@ -94,10 +137,13 @@ class Worker:
                 "normalized_yaml_bytes": len(normalized_yaml),
                 "converted_yaml_base64": base64.b64encode(normalized_yaml).decode("ascii"),
                 "normalization": normalized.receipt,
+                **converter_evidence,
                 "secret_fields_emitted_in_receipt": False,
                 "converted_yaml_contains_credentials": True,
                 "active_config_changed": False, "uci_changed": False, "service_restarted": False,
             }
+        except WorkerPolicyHold as error:
+            return self._hold(error.reason, evidence=error.evidence)
         except (UnicodeError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             return self._hold("REQUEST")
         except (urllib.error.URLError, TimeoutError, OSError):
@@ -182,23 +228,181 @@ class Worker:
                 raise yaml.YAMLError("scalar limit")
         return document
 
+    def _validated_shape_contract(self):
+        contract = self.shape_contract
+        if contract is None:
+            try:
+                with Path(__file__).with_name(SHAPE_CONTRACT_NAME).open("r", encoding="utf-8") as handle:
+                    contract = json.load(handle)
+            except (OSError, UnicodeError, json.JSONDecodeError) as error:
+                raise WorkerPolicyHold("CONTRACT") from error
+        expected_keys = {
+            "schema", "source_format", "allowed_top_level_keys", "required_top_level_keys",
+            "ignored_metadata_top_level_keys", "ignored_metadata_types",
+            "ignored_metadata_semantic_sha256", "converted_dns_present", *COUNT_CONTRACT_KEYS,
+        }
+        if not isinstance(contract, dict) or set(contract) != expected_keys:
+            raise WorkerPolicyHold("CONTRACT")
+        if contract.get("schema") != "publisher-v4-maying-converter-shape-contract-v2":
+            raise WorkerPolicyHold("CONTRACT")
+        if contract.get("source_format") != "BASE64_SSR_URI_LIST" or contract.get("converted_dns_present") is not False:
+            raise WorkerPolicyHold("CONTRACT")
+        allowed = contract.get("allowed_top_level_keys")
+        required = contract.get("required_top_level_keys")
+        if allowed != ["allow-lan", "external-controller", "log-level", "mode", "port", "proxies", "proxy-groups", "rules", "socks-port"] or required != allowed:
+            raise WorkerPolicyHold("CONTRACT")
+        metadata_keys = contract.get("ignored_metadata_top_level_keys")
+        metadata_types = contract.get("ignored_metadata_types")
+        if metadata_keys != ["allow-lan", "external-controller", "log-level", "mode", "port", "socks-port"]:
+            raise WorkerPolicyHold("CONTRACT")
+        if metadata_types != {
+            "allow-lan": "BOOL", "external-controller": "STRING", "log-level": "STRING",
+            "mode": "STRING", "port": "INT", "socks-port": "INT",
+        } or not re_full_sha256(contract.get("ignored_metadata_semantic_sha256", "")):
+            raise WorkerPolicyHold("CONTRACT")
+        for key in COUNT_CONTRACT_KEYS:
+            bounds = contract.get(key)
+            if not isinstance(bounds, dict) or set(bounds) != {"minimum", "maximum", "baseline"}:
+                raise WorkerPolicyHold("CONTRACT")
+            values = (bounds["minimum"], bounds["maximum"], bounds["baseline"])
+            if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+                raise WorkerPolicyHold("CONTRACT")
+            if not 0 <= values[0] <= values[2] <= values[1] <= 50_000:
+                raise WorkerPolicyHold("CONTRACT")
+        return contract
+
+    def _validate_converter_document(self, document, contract):
+        if "dns" in document:
+            raise WorkerPolicyHold("MAYING_DNS_UNEXPECTED", {
+                "dns_present": True,
+                "converter_dns_present": True,
+                "dns_semantic_sha256": self._semantic_sha256(document["dns"]),
+            })
+        ignored_keys = sorted(set(document) - {"proxies", "proxy-groups"})
+        shape_evidence = {
+            "converter_dns_present": False,
+            "converter_top_level_key_count": len(document),
+            "ignored_top_level_key_count": len(ignored_keys),
+            "ignored_top_level_key_set_sha256": self._semantic_sha256(ignored_keys),
+        }
+        if set(document) != set(contract["allowed_top_level_keys"]):
+            raise WorkerPolicyHold("MAYING_DOCUMENT_SHAPE", shape_evidence)
+        metadata_keys = contract["ignored_metadata_top_level_keys"]
+        metadata = {key: document[key] for key in metadata_keys}
+        type_checks = {
+            "BOOL": lambda value: type(value) is bool,
+            "INT": lambda value: type(value) is int,
+            "STRING": lambda value: type(value) is str,
+        }
+        metadata_types_valid = all(type_checks[contract["ignored_metadata_types"][key]](metadata[key]) for key in metadata_keys)
+        metadata_sha256 = self._semantic_sha256(metadata)
+        shape_evidence.update({
+            "ignored_metadata_key_count": len(metadata_keys),
+            "ignored_metadata_types_validated": metadata_types_valid,
+            "ignored_metadata_semantic_sha256": metadata_sha256,
+        })
+        if not metadata_types_valid or metadata_sha256 != contract["ignored_metadata_semantic_sha256"]:
+            raise WorkerPolicyHold("MAYING_DOCUMENT_SHAPE", shape_evidence)
+        rules = document.get("rules")
+        if not isinstance(rules, list):
+            raise WorkerPolicyHold("MAYING_DOCUMENT_SHAPE")
+        proxy_count = len(document["proxies"])
+        group_count = len(document["proxy-groups"])
+        rule_count = len(rules)
+        ignored_keys = sorted(set(document) - {"proxies", "proxy-groups"})
+        evidence = {
+            **shape_evidence,
+            "shape_contract_schema": contract["schema"],
+            "converter_proxy_count": proxy_count,
+            "converter_group_count": group_count,
+            "dns_present": False,
+            "converter_dns_present": False,
+            "ignored_rule_count": rule_count,
+            "ignored_rules_sha256": self._semantic_sha256(rules),
+        }
+        try:
+            self._validate_count(contract, "converted_proxy_count", proxy_count)
+            self._validate_count(contract, "converted_group_count", group_count)
+            self._validate_count(contract, "converted_rule_count", rule_count)
+        except WorkerPolicyHold as error:
+            raise WorkerPolicyHold(error.reason, evidence) from error
+        return evidence
+
+    def _validate_normalized_contract(self, contract, receipt, converted_count, udp_true_count, tfo_false_count, udp_evidence):
+        if receipt.get("source_format") != contract["source_format"]:
+            raise WorkerPolicyHold("MAYING_SOURCE_CONTRACT")
+        self._validate_count(contract, "source_uri_count", receipt.get("input_uri_count"))
+        self._validate_count(contract, "normalized_udp_true_count", udp_true_count)
+        self._validate_count(contract, "normalized_tfo_false_count", tfo_false_count)
+        if not (
+            receipt.get("udp_policy_validated") is True
+            and receipt.get("source_udp_capability_declared") is False
+            and receipt.get("runtime_udp_capability_verified") is False
+            and receipt.get("udp_true_validated_count") == udp_true_count
+            and receipt.get("tfo_false_enforced_count") == tfo_false_count
+            and converted_count == udp_true_count == tfo_false_count
+            and udp_evidence["converter_udp_absent_count"] + udp_evidence["converter_udp_true_count"] == converted_count
+            and udp_evidence["converter_udp_false_count"] == 0
+            and udp_evidence["worker_udp_materialized_count"] == udp_evidence["converter_udp_absent_count"]
+        ):
+            raise WorkerPolicyHold("UDP_COUNT_MISMATCH")
+
+    @staticmethod
+    def _validate_count(contract, key, observed):
+        bounds = contract[key]
+        if isinstance(observed, bool) or not isinstance(observed, int) or not bounds["minimum"] <= observed <= bounds["maximum"]:
+            reason = "UDP_COUNT_MISMATCH" if "udp" in key or "tfo" in key else "MAYING_DOCUMENT_SHAPE"
+            if key == "source_uri_count":
+                reason = "MAYING_SOURCE_CONTRACT"
+            raise WorkerPolicyHold(reason)
+
+    @staticmethod
+    def _semantic_sha256(value):
+        payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
     @staticmethod
     def _materialize_converter_policy(proxies):
         """Materialize udp=true when the converter omits its request-bound default."""
         if not isinstance(proxies, list):
             raise ValueError("proxies")
-        materialized = []
+        absent = 0
+        explicit_true = 0
+        explicit_false = 0
+        invalid_type = 0
         for proxy in proxies:
             if not isinstance(proxy, dict):
                 raise ValueError("proxy")
+            if "udp" not in proxy:
+                absent += 1
+            elif proxy["udp"] is True:
+                explicit_true += 1
+            elif proxy["udp"] is False:
+                explicit_false += 1
+            else:
+                invalid_type += 1
+        evidence = {
+            "converter_udp_absent_count": absent,
+            "converter_udp_true_count": explicit_true,
+            "converter_udp_false_count": explicit_false,
+            "converter_udp_type_invalid_count": invalid_type,
+            "worker_udp_materialized_count": 0,
+        }
+        if invalid_type:
+            raise WorkerPolicyHold("CONVERTER_UDP_TYPE", evidence)
+        if explicit_false:
+            raise WorkerPolicyHold("CONVERTER_UDP_FALSE", evidence)
+        materialized = []
+        for proxy in proxies:
             item = dict(proxy)
             if "udp" not in item:
                 item["udp"] = True
             materialized.append(item)
-        return materialized
+        evidence["worker_udp_materialized_count"] = absent
+        return materialized, evidence
 
     @staticmethod
-    def _hold(reason, normalization=None):
+    def _hold(reason, normalization=None, evidence=None):
         response = {
             "schema": "publisher-v4-worker-response-v1", "decision": "HOLD", "reason": reason,
             "authorization_effect": "NONE", "secret_fields_emitted_in_receipt": False,
@@ -207,6 +411,8 @@ class Worker:
         }
         if normalization is not None:
             response["normalization"] = normalization
+        if evidence is not None:
+            response.update(evidence)
         return response
 
 

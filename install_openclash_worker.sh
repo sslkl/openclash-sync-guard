@@ -19,6 +19,9 @@ case "$normalization_policy" in strict-v1|converter-name-authority-v1) ;; *) hol
 case "$deployment_id" in *[!0-9A-Z-]*|'') hold DEPLOYMENT_ID 11;; esac
 [ "${#deployment_id}" -ge 8 ] && [ "${#deployment_id}" -le 48 ] || hold DEPLOYMENT_ID 11
 case "$source_dir" in /*) ;; *) hold SOURCE_DIR 12;; esac
+[ -d "$source_dir" ] && [ ! -L "$source_dir" ] || hold SOURCE_DIR 12
+[ "$(stat -c '%u:%g' "$source_dir")" = '0:0' ] || hold SOURCE_DIR_OWNER 12
+find "$source_dir" -maxdepth 0 \( -perm -0020 -o -perm -0002 \) | grep -q . && hold SOURCE_DIR_WRITABLE 12
 case "$source_host_sha256" in *[!0-9a-f]*|'') hold SOURCE_ANCHOR 13;; esac
 [ "${#source_host_sha256}" -eq 64 ] || hold SOURCE_ANCHOR 13
 [ -f "$public_key_file" ] && [ ! -L "$public_key_file" ] || hold PUBLIC_KEY 14
@@ -26,14 +29,24 @@ public_key=$(cat "$public_key_file")
 case "$public_key" in ssh-ed25519\ *) ;; *) hold PUBLIC_KEY_TYPE 15;; esac
 [ "$(printf '%s\n' "$public_key" | wc -l | tr -d ' ')" -eq 1 ] || hold PUBLIC_KEY_LINES 16
 command -v ssh-keygen >/dev/null 2>&1 || hold SSH_KEYGEN 16
+command -v cmp >/dev/null 2>&1 || hold CMP 16
 ssh-keygen -lf "$public_key_file" 2>/dev/null | grep -q ' (ED25519)$' || hold PUBLIC_KEY_FORMAT 16
-for file in maying_normalizer.py maying_converter_reconciler.py openclash_worker.py openclash_worker_forced_command.sh; do
+for file in maying-converter-shape-contract.json maying_normalizer.py maying_converter_reconciler.py openclash_worker.py openclash_worker_forced_command.sh; do
   [ -f "$source_dir/$file" ] && [ ! -L "$source_dir/$file" ] || hold SOURCE_ASSET 17
 done
+vendor_version=pyyaml-6.0.2
+vendor_rel=vendor/$vendor_version
+vendor_files='LICENSE SOURCE.json yaml/__init__.py yaml/composer.py yaml/constructor.py yaml/cyaml.py yaml/dumper.py yaml/emitter.py yaml/error.py yaml/events.py yaml/loader.py yaml/nodes.py yaml/parser.py yaml/reader.py yaml/representer.py yaml/resolver.py yaml/scanner.py yaml/serializer.py yaml/tokens.py'
+[ -d "$source_dir/$vendor_rel/yaml" ] && [ ! -L "$source_dir/vendor" ] && [ ! -L "$source_dir/$vendor_rel" ] && [ ! -L "$source_dir/$vendor_rel/yaml" ] || hold SOURCE_VENDOR 17
+[ "$(find "$source_dir/$vendor_rel" -type f | wc -l | tr -d ' ')" -eq 19 ] || hold SOURCE_VENDOR 17
+[ "$(find "$source_dir/$vendor_rel" -type l | wc -l | tr -d ' ')" -eq 0 ] || hold SOURCE_VENDOR 17
+for file in $vendor_files; do [ -f "$source_dir/$vendor_rel/$file" ] && [ ! -L "$source_dir/$vendor_rel/$file" ] || hold SOURCE_VENDOR 17; done
+/usr/bin/python3 -I -B -c 'import json,pathlib,sys; root=pathlib.Path(sys.argv[1]).resolve(); meta=json.load(open(root/"SOURCE.json",encoding="utf-8")); assert meta.get("version")=="6.0.2"; assert meta.get("source_sha256")=="d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e"; sys.path.insert(0,str(root)); import yaml; assert yaml.__version__=="6.0.2"; assert pathlib.Path(yaml.__file__).resolve().is_relative_to(root)' "$source_dir/$vendor_rel" || hold SOURCE_VENDOR 17
 
 root=/opt/publisher-v4-openclash-worker
 auth=/home/syncsvc/.ssh/authorized_keys
 backup=/home/syncsvc/.ssh/sync-backups/publisher-v4-openclash-worker-v1-$key_id-$deployment_id
+id syncsvc >/dev/null 2>&1 || hold SERVICE_USER 18
 service_uid=$(id -u syncsvc)
 service_gid=$(id -g syncsvc)
 [ -f "$auth" ] && [ ! -L "$auth" ] || hold AUTHORIZED_KEYS 18
@@ -67,7 +80,7 @@ trap interrupted HUP INT TERM
 
 if [ -d "$root" ]; then
   find "$root" -xdev -type l | grep -q . && hold WORKER_SYMLINK 25
-  for pair in "maying_normalizer.py:maying_normalizer.py" "maying_converter_reconciler.py:maying_converter_reconciler.py" "openclash_worker.py:openclash_worker.py" "forced-command:openclash_worker_forced_command.sh"; do
+  for pair in "maying-converter-shape-contract.json:maying-converter-shape-contract.json" "maying_normalizer.py:maying_normalizer.py" "maying_converter_reconciler.py:maying_converter_reconciler.py" "openclash_worker.py:openclash_worker.py" "forced-command:openclash_worker_forced_command.sh"; do
     installed=${pair%%:*}; source=${pair#*:}
     [ -f "$root/$installed" ] && [ ! -L "$root/$installed" ] || hold EXISTING_ASSET 25
     [ "$(sha256sum "$root/$installed" | awk '{print $1}')" = "$(sha256sum "$source_dir/$source" | awk '{print $1}')" ] || hold EXISTING_DRIFT 26
@@ -75,15 +88,24 @@ if [ -d "$root" ]; then
   for file in source-host.sha256 normalization-policy; do
     [ -f "$root/$file" ] && [ ! -L "$root/$file" ] || hold EXISTING_ASSET 25
   done
+  for file in $vendor_files; do
+    [ -f "$root/$vendor_rel/$file" ] && [ ! -L "$root/$vendor_rel/$file" ] || hold EXISTING_ASSET 25
+    cmp -s "$source_dir/$vendor_rel/$file" "$root/$vendor_rel/$file" || hold EXISTING_DRIFT 26
+  done
   [ "$(tr -d '\n' <"$root/source-host.sha256")" = "$source_host_sha256" ] || hold EXISTING_ANCHOR_DRIFT 27
   [ "$(tr -d '\n' <"$root/normalization-policy")" = "$normalization_policy" ] || hold EXISTING_POLICY_DRIFT 28
 else
   install -d -m 0755 -o root -g root "$root"
   created_root=true
+  install -m 0444 -o root -g root "$source_dir/maying-converter-shape-contract.json" "$root/maying-converter-shape-contract.json"
   install -m 0444 -o root -g root "$source_dir/maying_normalizer.py" "$root/maying_normalizer.py"
   install -m 0444 -o root -g root "$source_dir/maying_converter_reconciler.py" "$root/maying_converter_reconciler.py"
   install -m 0444 -o root -g root "$source_dir/openclash_worker.py" "$root/openclash_worker.py"
   install -m 0555 -o root -g root "$source_dir/openclash_worker_forced_command.sh" "$root/forced-command"
+  install -d -m 0555 -o root -g root "$root/vendor" "$root/$vendor_rel" "$root/$vendor_rel/yaml"
+  for file in $vendor_files; do
+    install -m 0444 -o root -g root "$source_dir/$vendor_rel/$file" "$root/$vendor_rel/$file"
+  done
   printf '%s\n' "$source_host_sha256" >"$root/source-host.sha256"
   chmod 0444 "$root/source-host.sha256"
   chown root:root "$root/source-host.sha256"
@@ -92,7 +114,19 @@ else
   chown root:root "$root/normalization-policy"
 fi
 
-for file in maying_normalizer.py maying_converter_reconciler.py openclash_worker.py source-host.sha256 normalization-policy; do
+for pair in "maying-converter-shape-contract.json:maying-converter-shape-contract.json" "maying_normalizer.py:maying_normalizer.py" "maying_converter_reconciler.py:maying_converter_reconciler.py" "openclash_worker.py:openclash_worker.py" "forced-command:openclash_worker_forced_command.sh"; do
+  installed=${pair%%:*}; source=${pair#*:}
+  cmp -s "$source_dir/$source" "$root/$installed" || hold COPIED_BYTES 29
+done
+for file in $vendor_files; do
+  cmp -s "$source_dir/$vendor_rel/$file" "$root/$vendor_rel/$file" || hold COPIED_BYTES 29
+  [ "$(stat -c '%a:%u:%g' "$root/$vendor_rel/$file")" = '444:0:0' ] || hold WORKER_FILE_MODE 29
+done
+for path in "$root/vendor" "$root/$vendor_rel" "$root/$vendor_rel/yaml"; do
+  [ "$(stat -c '%a:%u:%g' "$path")" = '555:0:0' ] || hold WORKER_FILE_MODE 29
+done
+
+for file in maying-converter-shape-contract.json maying_normalizer.py maying_converter_reconciler.py openclash_worker.py source-host.sha256 normalization-policy; do
   [ "$(stat -c '%a:%u:%g' "$root/$file")" = '444:0:0' ] || hold WORKER_FILE_MODE 29
 done
 [ "$(stat -c '%a:%u:%g' "$root/forced-command")" = '555:0:0' ] || hold FORCED_COMMAND_MODE 29
@@ -115,6 +149,9 @@ chmod 0600 "$auth"
 
 /usr/bin/python3 -I -B -c 'import ast,sys; [ast.parse(open(path,"rb").read(),filename=path) for path in sys.argv[1:]]' \
   "$root/maying_normalizer.py" "$root/maying_converter_reconciler.py" "$root/openclash_worker.py"
+/usr/bin/python3 -I -B -c 'import json,sys; value=json.load(open(sys.argv[1],encoding="utf-8")); assert value.get("schema")=="publisher-v4-maying-converter-shape-contract-v2"' \
+  "$root/maying-converter-shape-contract.json"
+/usr/bin/python3 -I -B -c 'import pathlib,sys; root=pathlib.Path(sys.argv[1]).resolve(); sys.path.insert(0,str(root)); import yaml; assert yaml.__version__=="6.0.2"; assert pathlib.Path(yaml.__file__).resolve().is_relative_to(root)' "$root/$vendor_rel"
 /bin/sh -n "$root/forced-command"
 find "$root" -xdev -type d -name __pycache__ | grep -q . && hold PYTHON_CACHE 24
 printf 'COMMITTED\n' >"$backup/COMMITTED"
@@ -122,4 +159,4 @@ chown syncsvc:syncsvc "$backup/COMMITTED"
 chmod 0600 "$backup/COMMITTED"
 committed=true
 trap - EXIT HUP INT TERM
-printf '%s\n' 'INSTALL=PASS' "KEY_ID=$key_id" "DEPLOYMENT_ID=$deployment_id" "NORMALIZATION_POLICY=$normalization_policy" 'FORCED_COMMAND=true' 'SSH_RESTRICT=true' 'WORKER_ROOT_READ_ONLY=true' 'SOURCE_HOST_HASH_BOUND=true' 'SERVICE_INSTALLED=false'
+printf '%s\n' 'INSTALL=PASS' "KEY_ID=$key_id" "DEPLOYMENT_ID=$deployment_id" "NORMALIZATION_POLICY=$normalization_policy" 'VENDORED_PYYAML=6.0.2' 'FORCED_COMMAND=true' 'SSH_RESTRICT=true' 'WORKER_ROOT_READ_ONLY=true' 'SOURCE_HOST_HASH_BOUND=true' 'SERVICE_INSTALLED=false'

@@ -3,101 +3,305 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <meta name="description" content="OpenClash 双路由器配置同步、校验与回滚管理台">
   <title>OpenClash 同步管理台</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+  <a class="skip-link" href="#mainContent">跳到主内容</a>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">OC</span></div>
-    <div class="top-status"><span class="status-dot"></span><span id="modeText">正在连接管理服务…</span></div>
+    <div class="brand"><img class="brand-logo" src="/OpenClash_Sync_Logo.png" alt="OpenClash Sync 同步器"></div>
+    <div class="top-status" role="status" aria-live="polite" aria-atomic="true"><span class="status-dot" aria-hidden="true"></span><span id="modeText">正在连接管理服务…</span></div>
   </header>
 
-  <main>
+  <main id="mainContent" tabindex="-1" aria-labelledby="workspaceHeading">
     <section class="hero">
-      <div><p class="eyebrow">配置控制中心</p><h1>OpenClash同步器</h1><p>统一管理主配置与两个机场文件。所有写入都会先执行 YAML（配置文件格式）语法检查、结构检查和 SHA-256（摘要）并发保护。</p></div>
-      <button class="ghost" id="refreshStatus">刷新状态</button>
+      <div><p class="eyebrow">有序更新 · 安心管理</p><h1 id="workspaceHeading">OpenClash 同步器</h1><p class="hero-description">把两个子网的更新、分流与配置检查放在一起。先看状态，再做改变。</p><p class="appearance-note" id="appearanceNote">外观随系统 · 自动切换浅色 / 深色，无需刷新。</p></div>
+      <div class="hero-tools"><button class="ghost" id="refreshStatus" aria-describedby="statusFreshness">刷新状态</button><span id="statusFreshness" class="status-freshness" role="status" aria-live="polite">等待首次读取</span></div>
     </section>
+
+    <details class="operation-guide" id="quickStartGuide">
+      <summary class="guide-summary"><span class="guide-mark" aria-hidden="true">?</span><span><strong>第一次使用？三步看懂操作</strong><small>先看状态 → 再选功能 → 检查后确认</small></span><span class="guide-expand" aria-hidden="true">操作指南</span></summary>
+      <ol class="quick-start-steps"><li><b>1. 看两边状态</b><p>先刷新，确认目标子网。读取失败或结果为 UNKNOWN 时停止写入，先排查连接。</p></li><li><b>2. 按目的选功能</b><p>日常用“快速更新”；指定网站走哪个节点用“域名/IP”；需要独立出口用“链式代理”。</p></li><li><b>3. 检查再确认</b><p>先读取当前内容，再编辑和检查。写入后分别核对两边结果；不要把按钮完成当作运行正常。</p></li></ol>
+      <dl class="operation-steps">
+        <div><dt><span class="intent-tag intent-read">读取</span></dt><dd>先查看状态或载入当前内容</dd></div>
+        <div><dt><span class="intent-tag intent-preview">预览 / 检查</span></dt><dd>Stage（暂存）只说明候选已生成，不代表生效</dd></div>
+        <div><dt><span class="intent-tag intent-write">写入</span></dt><dd>保存或更新文件前，先确认目标与影响</dd></div>
+        <div><dt><span class="intent-tag intent-restart">重启</span></dt><dd>可能中断连接，结束后仍需核对运行结果</dd></div>
+      </dl>
+      <p class="guide-footnote">SHA-256 是文件的“内容指纹”，用来防止覆盖其他人的新修改。Stage 是候选暂存；UCI 是路由器配置接口。本页检查不会替代真实运行验收。</p>
+    </details>
+    <p class="status-caption" id="statusGuide">先点“刷新状态”核对两个子网。<code>UNKNOWN</code> 不是正常或故障结论，遇到它不要继续写入。<code>ACTIVE</code> 仅指所选配置路径，不是运行验收通过。</p>
 
     <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
 
-    <section class="target-grid" id="targetGrid" aria-label="路由器状态"></section>
+    <div id="operationStatus" class="operation-status hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="draftNotice" class="draft-notice hidden" role="status" aria-live="polite"></div>
+
+    <section class="target-grid" id="targetGrid" aria-label="子网 OpenClash 状态"></section>
 
     <section class="workspace">
       <nav class="sidebar" aria-label="功能导航">
-        <button class="nav-item active" data-panel="updates"><span>01</span>快速更新</button>
-        <button class="nav-item" data-panel="custom"><span>02</span>域名/IP 与 Fake-IP</button>
-        <button class="nav-item" data-panel="editor"><span>03</span>配置浏览与修改</button>
-        <button class="nav-item" data-panel="rollback"><span>04</span>主配置回滚</button>
-        <div class="term-card"><strong>术语说明</strong><p><b>Stage（暂存）</b><br>生成并校验候选文件，但不切换当前运行配置。</p><p><b>ACTIVE（当前启用配置）</b><br>OpenClash 当前选择的静态主配置路径。</p><p><b>SHA-256（摘要）</b><br>文件的内容校验值，用于识别变化和防止覆盖。</p><p><b>UCI（OpenWrt 配置接口）</b><br>路由器的系统配置数据库；本管理台不会更改 ACTIVE/UCI。</p></div>
+        <button class="nav-item active" data-panel="updates" aria-controls="updates" aria-current="page"><span class="nav-index" aria-hidden="true">01</span><span class="nav-copy"><strong>快速更新</strong><small>订阅与主配置</small></span></button>
+        <button class="nav-item" data-panel="custom" aria-controls="custom"><span class="nav-index" aria-hidden="true">02</span><span class="nav-copy"><strong>域名/IP 与 Fake-IP</strong><small>指定网站如何连接</small></span></button>
+        <button class="nav-item" data-panel="chain" aria-controls="chain"><span class="nav-index" aria-hidden="true">03</span><span class="nav-copy"><strong>链式代理</strong><small>为节点增加独立出口</small></span></button>
+        <button class="nav-item" data-panel="editor" aria-controls="editor"><span class="nav-index" aria-hidden="true">04</span><span class="nav-copy"><strong>配置浏览与修改</strong><small>读取、校验与编辑</small></span></button>
+        <button class="nav-item" data-panel="rollback" aria-controls="rollback"><span class="nav-index" aria-hidden="true">05</span><span class="nav-copy"><strong>主配置回滚</strong><small>恢复上一份主配置</small></span></button>
+        <button class="nav-item" data-panel="converter" aria-controls="converter"><span class="nav-index" aria-hidden="true">06</span><span class="nav-copy"><strong>订阅转换</strong><small>合并并导出订阅</small></span></button>
+        <details class="term-card"><summary>术语速查</summary><p><b>Stage（暂存）</b><br>生成并校验候选文件，但不切换当前运行配置。</p><p><b>ACTIVE（当前启用配置）</b><br>OpenClash 当前选择的静态主配置路径。</p><p><b>SHA-256（摘要）</b><br>文件的内容校验值，用于识别变化和防止覆盖。</p><p><b>UCI（OpenWrt 配置接口）</b><br>路由器的系统配置数据库；本管理台不会更改 ACTIVE/UCI。</p></details>
       </nav>
 
       <div class="panels">
-        <section class="panel active" id="updates">
-          <div class="panel-head"><div><p class="eyebrow">日常操作</p><h2>快速更新</h2><p>选择目标路由器后，按单项按钮执行。主配置会先生成 Candidate（候选配置）、通过检查和备份后再原子替换；不会自动 reload（重新加载）运行内核。</p></div></div>
-          <label class="field-label" for="updateTarget">目标路由器</label>
-          <select id="updateTarget"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select>
+        <section class="panel active" id="updates" aria-labelledby="updatesHeading">
+          <div class="panel-head"><div><p class="eyebrow">日常操作</p><h2 id="updatesHeading">快速更新</h2><p>更新各自的订阅文件，或重新生成两边主配置。按 路由器 A、路由器 B顺序执行，不把一边的订阅复制给另一边。</p></div><a class="external-link" href="https://nxonearth.com" target="_blank" rel="noopener noreferrer">打开 Nexitally 官网 ↗</a></div>
+          <p class="workflow-note" id="updatesWorkflow"><strong>先核对，再更新</strong> 下方按钮会更新两个子网，不是只读检查。先使用顶部“刷新状态”，再选择需要更新的文件；两边回执要分开核对，任一边失败时先排查，不要重复点击写入。</p>
+          <details class="context-help" id="updatesDetails"><summary>该点哪个按钮？更新后会发生什么？</summary><div class="help-content"><ol><li><b>机场节点刚有变化：</b>选择对应的“更新 Maying”或“更新 Nexitally”，只更新两边各自的机场文件。</li><li><b>要把最新来源合入主配置：</b>需要时先更新机场文件，再点“检查并更新”。它会生成 Candidate（候选）、校验、备份，再更新静态主配置。</li><li><b>内容真的变化时：</b>主配置更新会受控重启 OpenClash，期间连接可能短暂中断；不要关闭页面或重复点击。</li><li><b>结束后：</b>分别检查两边的写入、重启与校验回执，再确认常用网站能否正常访问。任一边失败时先核对当前状态，不自动重试。</li></ol></div></details>
           <div class="action-grid">
-            <article class="action-card primary-card"><div class="card-icon">主</div><div><h3>更新主配置文件</h3><p>重新生成 Candidate（候选配置），通过 Mihomo（OpenClash 核心）检查、备份后更新静态主配置。</p></div><button data-action="stage-main">检查并更新</button></article>
-            <article class="action-card"><div class="card-icon amber">M</div><div><h3>更新 Maying 机场文件</h3><p>调用 OpenClash 单订阅更新入口；可能触发配置检查。</p></div><button data-action="update-maying">更新 Maying</button></article>
-            <article class="action-card"><div class="card-icon blue">N</div><div><h3>更新 Nexitally 机场文件</h3><p>只更新目标路由器本机的 ProviderBase.yaml。</p></div><button data-action="update-nexitally">更新 Nexitally</button></article>
+            <article class="action-card primary-card"><div class="card-icon">主</div><div><span class="intent-tag intent-restart">写入 · 可能重启</span><h3>更新主配置文件</h3><p id="mainUpdateImpact">重新生成 Candidate（候选配置），通过 Mihomo（OpenClash 核心）检查、备份后更新静态主配置。</p></div><button class="write-action" data-action="stage-main" aria-describedby="mainUpdateImpact updatesWorkflow">检查并更新</button></article>
+            <article class="action-card"><div class="card-icon amber">M</div><div><span class="intent-tag intent-write">写入 · 订阅更新</span><h3>更新 Maying 机场文件</h3><p id="mayingUpdateImpact">调用 OpenClash 单订阅更新入口；可能触发配置检查。</p></div><button class="write-action secondary-write" data-action="update-maying" aria-describedby="mayingUpdateImpact updatesWorkflow">更新 Maying</button></article>
+            <article class="action-card"><div class="card-icon blue">N</div><div><span class="intent-tag intent-write">写入 · 订阅更新</span><h3>更新 Nexitally 机场文件</h3><p id="nexitallyUpdateImpact">串行更新两个子网各自本机的 ProviderBase.yaml，不在子网之间复制订阅内容。</p></div><button class="write-action secondary-write" data-action="update-nexitally" aria-describedby="nexitallyUpdateImpact updatesWorkflow">更新 Nexitally</button></article>
           </div>
         </section>
 
-        <section class="panel" id="custom">
-          <div class="panel-head"><div><p class="eyebrow">独立定制</p><h2>域名/IP 分流与 Fake-IP Filter</h2><p>自定义分流规则会放在主配置规则最前面，优先于订阅规则；Fake-IP Filter（虚拟 IP 过滤黑名单）中的域名将使用真实 DNS（域名解析）结果，不分配 Fake-IP。</p></div></div>
-          <div class="custom-toolbar">
-            <label>目标路由器<select id="customTarget"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select></label>
-            <button class="ghost" id="loadCustom">读取当前定制</button>
+        <section class="panel" id="custom" aria-labelledby="customHeading">
+          <div class="panel-head"><div><p class="eyebrow">独立定制</p><h2 id="customHeading">域名/IP 分流与 Fake-IP Filter</h2><p>让指定域名或 IP 走指定策略，或让部分域名使用真实 DNS 结果。自定义分流优先于订阅规则，保存会影响两个子网。</p></div></div>
+          <div class="custom-toolbar"><button class="ghost" id="loadCustom" aria-describedby="customWorkflow">读取两个子网并生成统一视图</button><span class="help" id="customWorkflow">先读取 → 编辑 → 检查 → 勾选确认 → 保存。相同匹配条件但策略不同会停止并提示；保存时按读取摘要做并发保护。遇到冲突或摘要变化时，先核对草稿和当前内容，不要反复保存。</span></div>
+          <details class="context-help" id="customHelp"><summary>规则类型、填写示例与常见误区</summary><div class="help-content"><dl class="help-definitions"><div><dt>只匹配一个域名</dt><dd>用 <code>DOMAIN</code>，如 <code>api.example.com</code>；不填写 https://、路径或端口。</dd></div><div><dt>整个域名及其子域名</dt><dd>用 <code>DOMAIN-SUFFIX</code>，如 <code>example.com</code>；不需要加 *。</dd></div><div><dt>匹配 IP 网段</dt><dd>IPv4 用 <code>IP-CIDR</code>，IPv6 用 <code>IP-CIDR6</code>。地址和掩码必须构成有效网段。</dd></div><div><dt>只想绕过 Fake-IP</dt><dd>添加到下方 Filter，而不是分流规则。Filter 影响 DNS 返回值，不决定走哪个代理。</dd></div></dl><p>策略选 <code>DIRECT</code> 表示直连。两个子网同一匹配条件策略不一致时会停止；先处理冲突，不靠再次保存覆盖。完整规则区只读，新增和修改使用下方编辑区。</p></div></details>
+          <div class="custom-section readonly-config">
+            <div class="section-title"><div><h3>两个 OpenClash 当前完整配置（只读并集）</h3><p>这里展示两边主配置中完整 <code>rules</code> 与 <code>dns.fake-ip-filter</code> 的去重并集并按分类/字母整理。单边存在的 DOMAIN/IP/Fake-IP 项会进入保存时补齐清单；带 <code>no-resolve</code>、额外选项或非规范文本的项目按完整原文补齐并在后续主配置更新时重放。<code>MATCH</code>、<code>GEOIP</code>、<code>RULE-SET</code> 等页面范围外规则只读展示，不会复制到规则首部。</p></div></div>
+            <div id="configuredSummary" class="help">请先读取两个子网</div>
+            <details><summary>查看完整分流规则</summary><pre id="configuredRules"></pre></details>
+            <details><summary>查看完整 Fake-IP Filter</summary><pre id="configuredFilters"></pre></details>
           </div>
           <div class="custom-section">
-            <div class="section-title"><div><h3>域名/IP 分流规则</h3><p>DOMAIN 为精确域名，DOMAIN-SUFFIX 为域名后缀，IP-CIDR/IP-CIDR6 为 IPv4/IPv6 网段；DIRECT 表示直连，也可选择当前主配置中的业务分组。业务分组名来自主配置，保持原名显示。</p></div><button class="ghost small-button" id="addRule">＋ 添加规则</button></div>
+            <div class="section-title"><div><h3>域名/IP 分流规则</h3><p>读取统一视图后，已有手工定制不会重复铺满新增区域；需要修改时从下方“已有定制”按项进入编辑。DOMAIN 为精确域名，DOMAIN-SUFFIX 为域名后缀，IP-CIDR/IP-CIDR6 为 IPv4/IPv6 网段。</p></div><button class="ghost small-button" id="addRule">＋ 添加新规则</button></div>
+            <details class="managed-items" id="managedRuleDetails"><summary>已有分流定制 <span id="managedRuleCount">0 条</span></summary><div class="managed-list" id="managedRuleList"><p class="empty-managed">请先读取两个子网</p></div></details>
             <div class="example-strip"><b>输入示例</b><code>DOMAIN · api.example.com · DIRECT</code><code>DOMAIN-SUFFIX · example.com · AI</code><code>IP-CIDR · 198.51.100.0/24 · 🎯Direct</code></div>
-            <div class="custom-list" id="ruleList"></div>
+            <div class="draft-label">新增或正在编辑 <span>重复项会在当前行提示</span></div>
+            <div class="custom-list" id="ruleList"><p class="empty-draft">暂无新增规则</p></div>
+          </div>
+          <div class="custom-section route-checker">
+            <div class="section-title"><div><h3>实时判路与通道可达性</h3><p>输入网址、域名或 IP，结合当前登录设备的来源 IP，按两个子网当前运行规则分别判断。输入值不会交给网络请求；可达性仅用固定健康探针检查命中的 DIRECT 或代理策略通道。</p></div></div>
+            <div class="route-form"><input id="routeValue" aria-label="判路网址、域名或 IP" placeholder="https://example.com 或 203.0.113.8" autocomplete="off"><button class="ghost" id="checkRoute">判断两个子网</button></div>
+            <div id="routeResult" class="route-result" aria-live="polite"></div>
           </div>
           <div class="custom-section">
-            <div class="section-title"><div><h3>Fake-IP Filter 黑名单</h3><p>适合局域网设备、局域网域名或不兼容 Fake-IP 的服务。禁止单独输入 <code>*</code>。</p></div><button class="ghost small-button" id="addFilter">＋ 添加黑名单</button></div>
+            <div class="section-title"><div><h3>Fake-IP Filter 黑名单</h3><p>读取后只显示已有数量；需要修改时从“已有定制”按项进入编辑。适合局域网设备、局域网域名或不兼容 Fake-IP 的服务，禁止单独输入 <code>*</code>。</p></div><button class="ghost small-button" id="addFilter">＋ 添加新条目</button></div>
+            <details class="managed-items" id="managedFilterDetails"><summary>已有 Fake-IP Filter 定制 <span id="managedFilterCount">0 条</span></summary><div class="managed-list" id="managedFilterList"><p class="empty-managed">请先读取两个子网</p></div></details>
             <div class="example-strip"><b>输入示例</b><code>printer.lan</code><code>*.example.com</code><code>+.example.com</code></div>
-            <div class="custom-list" id="filterList"></div>
+            <div class="draft-label">新增或正在编辑 <span>大小写与尾点等价重复也会提示</span></div>
+            <div class="custom-list" id="filterList"><p class="empty-draft">暂无新增条目</p></div>
           </div>
-          <div class="custom-footer">
+          <div class="custom-footer action-footer">
             <div class="custom-status-block">
-              <span id="customValidation" class="validation idle">请先读取当前定制</span>
-              <label class="restart-confirm"><input type="checkbox" id="customConfirm">我知道主配置发生变化时会重启目标路由器的 OpenClash，通常需要 1–3 分钟；失败时会自动恢复。内容未变化则不会重启。</label>
+              <span id="customValidation" class="validation idle" role="status" aria-live="polite">请先读取当前定制</span>
+              <label class="restart-confirm" id="customImpact" for="customConfirm"><input type="checkbox" id="customConfirm">我知道任一子网的主配置发生变化时，该子网 OpenClash 会受控重启，通常需要 1–3 分钟；失败时会尝试自动恢复，仍需核对恢复结果。内容未变化则不会重启。</label>
             </div>
-            <div><button class="ghost" id="validateCustom">检查全部语法</button><button class="primary" id="saveCustom" disabled>校验并保存定制</button></div>
+            <div role="group" aria-label="检查与保存定制"><button class="ghost preview-action" id="validateCustom" aria-describedby="customWorkflow">检查全部语法</button><button class="primary write-action" id="saveCustom" disabled aria-describedby="customImpact customValidation">校验并保存定制</button></div>
           </div>
         </section>
 
-        <section class="panel" id="editor">
-          <div class="panel-head"><div><p class="eyebrow">YAML（配置文件格式）编辑器</p><h2>浏览与修改当前配置</h2><p>读取文件后会记录原始 SHA-256（摘要）；若服务器端文件已变化，保存会被拒绝。</p></div></div>
-          <div class="editor-toolbar">
-            <label>目标路由器<select id="editorTarget"><option value="router_a">路由器 A</option><option value="router_b">路由器 B</option></select></label>
-            <label>配置文件<input id="fileName" value="ProviderBase-ProviderSource.yaml" placeholder="示例：ProviderBase.yaml"></label>
-            <button class="ghost" id="readConfig">读取当前文件</button>
+        <section class="panel" id="chain" aria-labelledby="chainHeading">
+          <div class="panel-head">
+            <div><p class="eyebrow">单路由器 · 独立出口</p><h2 id="chainHeading">链式代理</h2><p>原节点 → 落地代理 → 网站。原节点负责连接家宽或服务器上的代理服务；不是裸 IP 转发，必须提供可用的代理协议、地址及端口。启用后保留原节点名称和现有分组引用；取消时恢复原节点。</p></div>
           </div>
+          <p class="workflow-note" id="chainWorkflow"><strong>只作用于所选子网</strong> 先读取并选择节点，检查后确认应用。保存不等于连通；需要验证时，请主动使用下方“测试所选已保存链路”。测试为 UNKNOWN（无法确认）或失败时，不要当作链路可用。</p>
+          <details class="context-help" id="chainHelp"><summary>什么是链式代理？需要准备哪些信息？</summary><div class="help-content"><div class="chain-flow" aria-label="流量路径"><span>你的设备</span><b aria-hidden="true">→</b><span>原节点</span><b aria-hidden="true">→</b><span>落地代理</span><b aria-hidden="true">→</b><span>网站</span></div><p>落地必须是已经运行的 SOCKS5、HTTP(S) 或 Shadowsocks 服务。只有一个家宽 IP 或服务器 IP，不能自动成为代理。</p><ol><li>选择目标子网并读取节点，再选需要新增出口的原节点。</li><li>按服务提供的信息填写地址、端口、协议和认证；TLS 会校验证书。</li><li>检查并确认影响后保存，再单独测试已保存链路。测试只证明本次固定探针结果，不证明住宅出口身份或所有网站可用。</li><li>想恢复时，选择原链路并“取消链式”。不会改动另一子网，也不会删除原节点。</li></ol><p>密码不回显；修改连接身份后需重新输入，不要把订阅链接填进落地地址。</p></div></details>
+          <div id="chainPreview" class="warning hidden"><strong id="chainPreviewHeading">预览模式</strong><p id="chainPreviewText">本面板仅用于配置演示；没有连接真实路由器，测试不会标记为实时链路成功。</p></div>
+          <div class="chain-toolbar">
+            <div class="chain-field"><label for="chainTarget">目标子网</label><select id="chainTarget" aria-describedby="chainReadState"><option value="router_a">路由器 A</option><option value="router_b">路由器 B</option></select></div>
+            <button type="button" class="ghost" id="loadChain">读取节点与链式配置</button>
+          </div>
+          <p id="chainReadState" class="help" role="status">请先读取所选子网。链式设置不会自动同步到另一个子网。</p>
+          <section class="custom-section" aria-labelledby="chainListHeading">
+            <div class="section-title"><div><h3 id="chainListHeading">已启用的链路 <span id="chainCount" class="help-inline">0 条</span></h3><p>选择一条链路后可更新、取消或测试。密码不会读取回显。</p></div></div>
+            <div id="chainList" class="chain-list"><p class="empty-managed">尚未读取链式配置</p></div>
+          </section>
+          <form id="chainForm" class="custom-section" autocomplete="off" novalidate>
+            <div class="section-title"><div><h3 id="chainFormHeading">新增或更新链路</h3><p id="chainSelectionState">先选择原节点，再配置落地代理。</p></div></div>
+            <div class="chain-fields">
+              <div class="chain-field chain-wide"><label for="chainNode">原节点</label><select id="chainNode" aria-describedby="chainSelectionState" disabled><option value="">请先读取节点</option></select></div>
+              <div class="chain-field"><label for="chainType">落地协议</label><select id="chainType" aria-describedby="chainProtocolHint"><option value="socks5">SOCKS5</option><option value="http">HTTP / HTTPS</option><option value="ss">Shadowsocks（SS）</option></select><small class="help" id="chainProtocolHint">选择落地服务实际支持的协议；端口、认证和加密设置需与该服务一致。</small></div>
+              <div class="chain-field"><label for="chainPort">端口</label><input id="chainPort" type="number" inputmode="numeric" min="1" max="65535" step="1" placeholder="例如：1080" required></div>
+              <div class="chain-field chain-wide"><label for="chainServer">落地地址</label><input id="chainServer" type="text" spellcheck="false" autocomplete="off" maxlength="253" placeholder="代理服务的 IP 或域名，不含协议、路径或端口" aria-describedby="chainEndpointHelp" required><small id="chainEndpointHelp" class="help">填写 SOCKS5、HTTP(S) 或 SS 服务地址；IPv6 地址不需要方括号。不要填写订阅链接。</small></div>
+              <div class="chain-field" id="chainUsernameField"><label for="chainUsername">用户名（可选）</label><input id="chainUsername" type="text" autocomplete="off" spellcheck="false" maxlength="255"></div>
+              <div class="chain-field" id="chainPasswordField"><label for="chainPassword">密码</label><input id="chainPassword" type="password" autocomplete="new-password" spellcheck="false" maxlength="4096" aria-describedby="chainPasswordHint"><small id="chainPasswordHint" class="help">新链路按代理服务要求填写；SS 必须提供密码。</small></div>
+              <div class="chain-wide"><label class="chain-check" for="chainKeepPassword"><input id="chainKeepPassword" type="checkbox" aria-describedby="chainKeepHint" disabled>明确保留路由器中已保存的密码</label><small id="chainKeepHint" class="help">仅可对同一节点、协议、地址、端口、用户名、TLS/SNI 及加密方式保留密码。修改身份后必须重新输入。</small></div>
+              <div class="chain-field" id="chainTlsField"><label class="chain-check" for="chainTls"><input id="chainTls" type="checkbox">启用 TLS（HTTP 下即 HTTPS）</label><small class="help">验证服务端证书，不提供跳过证书校验选项。</small></div>
+              <div class="chain-field" id="chainSniField"><label for="chainSni">TLS 服务器名称 SNI（可选）</label><input id="chainSni" type="text" autocomplete="off" spellcheck="false" maxlength="253" placeholder="证书对应的域名"></div>
+              <div class="chain-field hidden" id="chainCipherField"><label for="chainCipher">SS 加密方式</label><select id="chainCipher"><option value="aes-128-gcm">aes-128-gcm</option><option value="aes-256-gcm">aes-256-gcm</option><option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option></select></div>
+            </div>
+            <p id="chainValidation" class="validation idle" role="status" aria-live="polite">请先读取并选择原节点</p>
+            <label class="restart-confirm" for="chainConfirm"><input type="checkbox" id="chainConfirm">我知道应用或取消会改变此节点的出口；配置发生变化时，所选子网的 OpenClash 可能受控重启。不会改变另一子网的链式设置。</label>
+            <div class="chain-actions" role="group" aria-label="检查、应用或取消链式设置">
+              <button type="button" class="ghost preview-action" id="validateChain" disabled>检查链式配置</button>
+              <button type="submit" class="primary write-action" id="saveChain" disabled aria-describedby="chainWorkflow chainValidation">应用链式代理</button>
+              <button type="button" class="remove-row" id="removeChain" disabled>取消所选链式代理</button>
+              <button type="button" class="ghost" id="resetChain" disabled>放弃此草稿</button>
+            </div>
+            <small class="help">密码仅用于本次校验/提交，不写入浏览器持久存储；提交尝试完成后清空输入框。保存并不等于已通过链路测试。</small>
+          </form>
+          <section class="custom-section" aria-labelledby="chainTestHeading">
+            <div class="section-title"><div><h3 id="chainTestHeading">验证已保存的链路</h3><p>只使用服务端固定探针，分别显示配置、运行态、原节点和完整链路结果。未保存草稿不参与测试；测试不证明所有网站、UDP 或落地地址的家宽身份。</p></div><button type="button" class="ghost" id="testChain" disabled>测试所选已保存链路</button></div>
+            <div id="chainTestResult" class="chain-test-result" role="status" aria-live="polite" aria-atomic="true"><p class="help">尚未测试。无法确认的结果显示 UNKNOWN，而非成功。</p></div>
+          </section>
+        </section>
+
+        <section class="panel" id="converter" aria-labelledby="converterHeading">
+          <div class="panel-head"><div><p class="eyebrow">Subscription Converter</p><h2 id="converterHeading">订阅转换工作台</h2><p>合并订阅、调整参数并导出配置。实际转换使用 WORKER 断网隔离执行器；内容只留在本页和本次任务，不上传公共短链站。</p></div><button type="button" class="ghost" id="loadConverter" aria-controls="converterForm">加载转换选项</button></div>
+          <p class="validation idle" id="converterState" role="status" aria-live="polite">加载后可生成链接或执行隔离转换。导出文件不等于写入路由器；双子网默认主配置、DNS 与路由保持不变。</p>
+          <p class="workflow-note" id="converterWorkflow"><strong>转换与应用分开</strong> 加载选项 → 填写来源 → 转换并核对结果 → 导出。实际转换会提交本次输入；下载到本机不等于写入路由器，应用须在独立区域另行确认目标与影响。结果未验证、已过期或失败时，不要应用到路由器；先重新转换并核对结果。</p>
+          <details class="context-help" id="converterHelp"><summary>生成链接、实际转换、下载和应用有什么区别？</summary><div class="help-content"><dl class="help-definitions"><div><dt>生成链接</dt><dd>只生成一条带参数的转换 URL，不验证源是否可达。链接可能含订阅凭据，不要公开分享。</dd></div><div><dt>实际转换</dt><dd>把本次输入提交给同步器，受控取源后在隔离执行器转换。先确认目标客户端，再核对输出的节点与规则。</dd></div><div><dt>下载 / 复制</dt><dd>把结果交给你，不写入路由器。结果是敏感配置，妥善保管。</dd></div><div><dt>应用到路由器</dt><dd>在独立区域选择单个目标、生成预览并确认。默认只追加节点；合并规则是另一种显式模式，不要把格式检查当作安全审计。</dd></div></dl><p>不确定的进阶参数保持默认。远程模板、短链和 Gist 等外部服务会扩大数据访问范围，只有在理解接收方和影响后才使用。</p></div></details>
+          <form id="converterForm" autocomplete="off" aria-describedby="converterState">
+            <div class="converter-grid">
+              <div><label for="converterProfile">参数预设（不替换子网主配置）</label><select id="converterProfile" disabled aria-describedby="converterProfileHint"><option value="manual">手动参数</option></select><small class="help" id="converterProfileHint">预设填充转换参数，不替换子网主配置；选用后请核对目标客户端及进阶设置。</small></div>
+              <div><label for="converterTarget">目标客户端</label><select id="converterTarget" aria-describedby="converterTargetHint" disabled></select><small id="converterTargetHint" class="help" hidden>Mellow 仅支持保守兼容子集，不支持 HTTP 伪装、插件等；其他源格式需转为显式 Clash 配置后输入，仍须满足协议限制。</small></div>
+              <div class="converter-wide"><label for="converterSources">订阅或节点链接（敏感）</label><textarea id="converterSources" rows="5" autocomplete="off" spellcheck="false" placeholder="每行一个或用 | 分隔；支持 HTTP(S) 订阅与节点分享链接" disabled aria-describedby="converterSourceHint"></textarea><small class="help" id="converterSourceHint">源顺序和重复项均保留。生成链接不代表网络通畅，也不会改动订阅更新源。</small></div>
+            </div>
+            <details id="converterLocal">
+              <summary>上传或粘贴订阅内容 · 不需要公开文件地址</summary>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converterUpload">选择订阅文件（可多选，UTF-8）</label><input id="converterUpload" type="file" multiple accept=".txt,.yaml,.yml,.json,.conf" disabled aria-describedby="converterUploadHint"><small class="help" id="converterUploadHint">链接、文件与粘贴合计最多 32 个源；本地内容、配置、自定义参数、脚本及共享资源合计 1 MiB。文件只在本页内存中读取，点击“实际转换”才发送。</small></div>
+                <div class="converter-wide"><div id="converterFiles" class="converter-files" aria-live="polite">尚未选择文件</div><button type="button" class="ghost" id="clearConverterFiles" disabled>移除已选订阅文件</button></div>
+                <div class="converter-wide"><label for="converterPaste">粘贴订阅内容（作为一个额外源）</label><textarea id="converterPaste" rows="5" autocomplete="off" spellcheck="false" placeholder="支持 YAML / JSON / Base64 订阅和逐行节点分享链接" disabled></textarea></div>
+              </div>
+            </details>
+            <details id="converterAdvanced"><summary>进阶参数 · 后端、配置、自定义模板参数与开关</summary>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converterBackend">自建后端地址</label><input id="converterBackend" type="url" autocomplete="off" spellcheck="false" disabled aria-describedby="converterBackendHint"><small class="help" id="converterBackendHint">修改仅影响生成的链接，不会自动访问新后端；使用链接时后端将收到源凭据。</small></div>
+                <div class="converter-wide"><label for="converterConfigPreset">远程配置模板目录（可选）</label><select id="converterConfigPreset" aria-describedby="converterConfigPresetHint" disabled><option value="">自定义 / 手工输入</option></select><small id="converterConfigPresetHint" class="help">加载目录后可按组选择；仅填写 URL 草稿，不下载模板、不执行转换或应用。也可直接手工输入。</small></div>
+                <div class="converter-wide"><label for="converterConfig">远程配置 URL（可选）</label><input id="converterConfig" type="url" autocomplete="off" spellcheck="false" disabled aria-describedby="converterConfigHint"><small class="help" id="converterConfigHint">远程模板可改变规则及策略组；需要检查内容，不能把格式检查当作安全审计。</small></div>
+              </div>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converterConfigUpload">上传外部配置（可选）</label><input id="converterConfigUpload" type="file" accept=".ini,.yaml,.yml,.toml,.txt,.conf" disabled></div>
+                <div class="converter-wide"><label for="converterConfigContent">外部配置文本（INI [custom] / YAML custom / TOML version=1）</label><textarea id="converterConfigContent" rows="5" autocomplete="off" spellcheck="false" placeholder="不能与远程配置 URL 同时填写" disabled></textarea><small class="help">模板和规则的公开 HTTP(S) 依赖会先受控取回。不会读取主机文件、生产后端配置或执行器外的凭据。</small></div>
+              </div>
+              <div class="converter-grid">
+                <div class="converter-wide">
+                  <label for="converterParameters">主转换自定义模板参数（JSON 对象，值只能是字符串）</label>
+                  <textarea id="converterParameters" rows="5" autocomplete="off" spellcheck="false" aria-describedby="converterParametersHint converterParametersState" aria-invalid="false" disabled>{}</textarea>
+                  <small id="converterParametersHint" class="help">最多 32 项，每个值最多 4096 UTF-8 字节，不含控制字符或无效 Unicode。名称为字母开头的 1–64 位字母、数字、_、-、.；保留字段以加载的参数目录为准，不能覆盖内建选项或 url / path / token / upload / groups / ruleset / profile_data 等控制项。留空或 {} 不附加参数。生成链接会将这些值写入查询串，实际转换会将相同值传入隔离执行器；可能含凭据，请勿公开。编辑不会自动发送。</small>
+                  <p id="converterParametersState" class="validation idle" role="status" aria-live="polite" aria-atomic="true">请先加载转换选项。</p>
+                </div>
+              </div>
+              <div id="converterOptions" class="converter-grid"></div>
+            </details>
+            <details id="converterScripts"><summary>过滤与排序脚本 · 仅在隔离执行器中运行</summary>
+              <p class="help">每个脚本最多 64 KiB，并计入本次转换的 1 MiB 本地输入预算。脚本是可执行内容，请只使用经过审阅的代码；不会在浏览器运行。资源可通过 asset:文件名 引用。填写脚本后不能生成会遗漏脚本的订阅链接。</p>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converterFilterScriptUpload">读取过滤脚本文件（UTF-8）</label><input id="converterFilterScriptUpload" type="file" accept=".js,.txt" disabled></div>
+                <div class="converter-wide"><label for="converterFilterScript">过滤脚本 · scripts.filter</label><textarea id="converterFilterScript" rows="6" autocomplete="off" spellcheck="false" disabled></textarea></div>
+                <div class="converter-wide"><label for="converterSortScriptUpload">读取排序脚本文件（UTF-8）</label><input id="converterSortScriptUpload" type="file" accept=".js,.txt" disabled></div>
+                <div class="converter-wide"><label for="converterSortScript">排序脚本 · scripts.sort</label><textarea id="converterSortScript" rows="6" autocomplete="off" spellcheck="false" aria-describedby="converterScriptHint" disabled></textarea><small id="converterScriptHint" class="help">排序脚本会在执行器自动启用 sort；若高级参数已明确设为 false，将在发送前拒绝。请选择开启或继承后端，或清空脚本。</small></div>
+              </div>
+            </details>
+            <div class="converter-actions converter-main-actions" role="group" aria-label="转换预览与链接操作"><button type="button" class="primary preview-action" id="executeConverter" disabled aria-describedby="converterWorkflow converterExecutionHint">实际转换并预览</button><button type="submit" class="ghost" id="generateConverter" disabled>仅生成订阅链接</button><button type="button" class="ghost" id="validateConverter" disabled>校验链接参数</button><button type="button" class="ghost" id="clearConverter" disabled>清空敏感内容</button></div>
+            <p class="help" id="converterExecutionHint">隔离执行器状态尚未加载。</p>
+          </form>
+          <section class="custom-section converter-export"><h3>转换内容与手动编辑</h3><p id="converterExportState" class="validation idle" role="status" aria-live="polite">尚未执行转换。</p><label for="converterText">导出配置（可能含节点凭据，请勿公开）</label><textarea id="converterText" rows="14" autocomplete="off" spellcheck="false" disabled></textarea><div class="converter-actions"><button type="button" class="ghost" id="copyConverterText" disabled>复制内容</button><button type="button" class="primary" id="downloadConverter" disabled>下载配置</button><button type="button" class="ghost" id="restoreConverterText" disabled>恢复生成版本</button></div><small class="help">手动修改会失去原始摘要验证状态。普通导出模板不是任一子网的运维主配置；不要直接覆盖路由器的 DNS、路由与定制。此处不会写入路由器。</small>
+            <div id="converterApplyMount"></div>
+          </section>
+          <div id="converterServicesMount"></div>
+          <details id="converterResourceWorkspace"><summary>共享资源文件 · 主转换与三个工具共用</summary>
+            <p class="help" id="converterResourceHint">用 asset:文件名 引用，例如外部配置中的 clash_rule_base=asset:base.yaml，或模板中的 {% include "asset:part.tpl" %}。资源名须为字母/数字开头的 1–64 位字母、数字、_、-、.，不能含 ..；无效或重名时请在本机重命名后重选，不会静默改名。不读取主机路径、不解压 ZIP。</p>
+            <label for="converterResourceUpload">添加资源文件（UTF-8，可多选）</label><input id="converterResourceUpload" type="file" multiple aria-describedby="converterResourceHint" disabled>
+            <div id="converterResources" class="converter-files" aria-live="polite">尚未添加资源。主转换与下方工具共用此列表。</div>
+            <div class="converter-actions"><button type="button" class="ghost" id="clearConverterResources" disabled>移除全部共享资源</button></div>
+            <small class="help">列表中的所有资源会随你选择执行的主转换或工具一起发送，仅附加、不主动执行。最多 64 个资源，源与显式文件合计最多 64 个；每次执行的文本与资源合计 1 MiB。远程来源大小及依赖展开另由后端校验。添加资源后仅生成链接不可用；移除资源会使所有已有结果失效。</small>
+          </details>
+          <details id="converterTools"><summary>转换工具 · 规则集 / 模板渲染 / Surge → Clash</summary>
+            <p class="help">工具与主转换各自保留草稿，但共用全页操作锁、隔离执行器和上方资源列表。只有点击对应的执行按钮才会发送；远程来源仅支持受控公网 HTTP(S) 80/443，内网来源请读入本机文本。不会自动写入路由器或复制凭据。</p>
+            <details class="converter-tool" id="converter-ruleset"><summary>规则集转换</summary>
+              <p class="help">支持一份粘贴/文件文本与多条远程 URL 合并，合计最多 32 个源；输入格式对本次所有源生效。</p>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converter-ruleset-upload">读取工具输入文件（替换下方文本，UTF-8）</label><input id="converter-ruleset-upload" type="file" accept=".txt,.conf,.ini,.yaml,.yml,.json,.tpl,.list" disabled></div>
+                <div class="converter-wide"><label for="converter-ruleset-content">输入文本（可编辑，可能含凭据）</label><textarea id="converter-ruleset-content" rows="6" autocomplete="off" spellcheck="false" disabled></textarea></div>
+                <div class="converter-wide"><label for="converter-ruleset-urls">远程 HTTP(S) 来源（每行一个，不会自动访问）</label><textarea id="converter-ruleset-urls" rows="3" autocomplete="off" spellcheck="false" disabled></textarea></div>
+                <div><label for="converter-ruleset-input-format">输入规则格式</label><select id="converter-ruleset-input-format" disabled><option value="surge">Surge</option><option value="quanx">Quantumult X</option><option value="clash-domain">Clash domain</option><option value="clash-ipcidr">Clash ipcidr</option><option value="clash-classic">Clash classical</option></select></div>
+                <div><label for="converter-ruleset-type">输出规则类型</label><select id="converter-ruleset-type" disabled><option value="1">1 · Surge</option><option value="2">2 · Quantumult X</option><option value="3">3 · Clash domain provider</option><option value="4">4 · Clash ipcidr provider</option><option value="5">5 · Surge DOMAIN-SET</option><option value="6">6 · Clash classical</option></select></div>
+                <div class="converter-wide"><label for="converter-ruleset-group">规则策略组名（Quantumult X 输出使用）</label><input id="converter-ruleset-group" type="text" value="Proxy" maxlength="128" autocomplete="off" spellcheck="false" disabled><small class="help">最多 128 UTF-8 字节，不能含逗号、竖线、反引号或控制字符。</small></div>
+              </div>
+              <div class="converter-actions"><button type="button" class="primary" id="converter-ruleset-run" disabled>执行规则集转换</button><button type="button" class="ghost" id="converter-ruleset-clear" disabled>清空此工具</button></div>
+              <p id="converter-ruleset-state" class="validation idle" role="status" aria-live="polite">请先加载转换选项。</p>
+              <label for="converter-ruleset-result">结果预览与编辑（可能含凭据，请勿公开）</label><textarea id="converter-ruleset-result" class="converter-tool-result" rows="10" autocomplete="off" spellcheck="false" disabled></textarea>
+              <div class="converter-actions"><button type="button" class="ghost" id="converter-ruleset-copy" disabled>复制结果</button><button type="button" class="primary" id="converter-ruleset-download" disabled>下载结果</button><button type="button" class="ghost" id="converter-ruleset-restore" disabled>恢复生成版本</button></div>
+              <small class="help">编辑结果不会自动执行或重新校验；输入与资源变化后保留旧草稿但不再标为有效。下载是本机文件，不代表部署验收。</small>
+            </details>
+            <details class="converter-tool" id="converter-template"><summary>模板渲染</summary>
+              <p class="help">只接受一个来源：粘贴/文件文本或一个远程 URL，二选一。模板通过 {{ request.title }} 读取下方变量，通过 asset:文件名 引用共享资源。</p>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converter-template-upload">读取工具输入文件（替换下方文本，UTF-8）</label><input id="converter-template-upload" type="file" accept=".txt,.conf,.ini,.yaml,.yml,.json,.tpl,.list" disabled></div>
+                <div class="converter-wide"><label for="converter-template-content">输入文本（可编辑，可能含凭据）</label><textarea id="converter-template-content" rows="6" autocomplete="off" spellcheck="false" disabled></textarea></div>
+                <div class="converter-wide"><label for="converter-template-urls">远程 HTTP(S) 来源（每行一个，不会自动访问）</label><textarea id="converter-template-urls" rows="3" autocomplete="off" spellcheck="false" disabled></textarea></div>
+                <div class="converter-wide"><label for="converter-template-variables">模板变量（JSON 对象；值只能是字符串）</label><textarea id="converter-template-variables" rows="4" autocomplete="off" spellcheck="false" placeholder='{"title":"示例"}' disabled>{}</textarea><small class="help">最多 32 项、每个值最多 4096 UTF-8 字节，不含控制字符。变量名为字母开头的 1–64 位字母、数字、_、-、.；path、constructor、prototype 等保留名不可用。变量可能含凭据，随执行请求发送。</small></div>
+              </div>
+              <div class="converter-actions"><button type="button" class="primary" id="converter-template-run" disabled>执行模板渲染</button><button type="button" class="ghost" id="converter-template-clear" disabled>清空此工具</button></div>
+              <p id="converter-template-state" class="validation idle" role="status" aria-live="polite">请先加载转换选项。</p>
+              <label for="converter-template-result">结果预览与编辑（可能含凭据，请勿公开）</label><textarea id="converter-template-result" class="converter-tool-result" rows="10" autocomplete="off" spellcheck="false" disabled></textarea>
+              <div class="converter-actions"><button type="button" class="ghost" id="converter-template-copy" disabled>复制结果</button><button type="button" class="primary" id="converter-template-download" disabled>下载结果</button><button type="button" class="ghost" id="converter-template-restore" disabled>恢复生成版本</button></div>
+              <small class="help">编辑结果不会自动执行或重新校验；输入与资源变化后保留旧草稿但不再标为有效。下载是本机文件，不代表部署验收。</small>
+            </details>
+            <details class="converter-tool" id="converter-surge2clash"><summary>Surge → Clash</summary>
+              <p class="help">只接受一份 Surge 配置：粘贴/文件文本或一个远程 URL，二选一。此工具没有额外选项；后端无法保留的规则、策略组或依赖将明确失败，不返回缺项配置。</p>
+              <div class="converter-grid">
+                <div class="converter-wide"><label for="converter-surge2clash-upload">读取工具输入文件（替换下方文本，UTF-8）</label><input id="converter-surge2clash-upload" type="file" accept=".txt,.conf,.ini,.yaml,.yml,.json,.tpl,.list" disabled></div>
+                <div class="converter-wide"><label for="converter-surge2clash-content">输入文本（可编辑，可能含凭据）</label><textarea id="converter-surge2clash-content" rows="6" autocomplete="off" spellcheck="false" disabled></textarea></div>
+                <div class="converter-wide"><label for="converter-surge2clash-urls">远程 HTTP(S) 来源（每行一个，不会自动访问）</label><textarea id="converter-surge2clash-urls" rows="3" autocomplete="off" spellcheck="false" disabled></textarea></div>
+              </div>
+              <div class="converter-actions"><button type="button" class="primary" id="converter-surge2clash-run" disabled>执行Surge → Clash</button><button type="button" class="ghost" id="converter-surge2clash-clear" disabled>清空此工具</button></div>
+              <p id="converter-surge2clash-state" class="validation idle" role="status" aria-live="polite">请先加载转换选项。</p>
+              <label for="converter-surge2clash-result">结果预览与编辑（可能含凭据，请勿公开）</label><textarea id="converter-surge2clash-result" class="converter-tool-result" rows="10" autocomplete="off" spellcheck="false" disabled></textarea>
+              <div class="converter-actions"><button type="button" class="ghost" id="converter-surge2clash-copy" disabled>复制结果</button><button type="button" class="primary" id="converter-surge2clash-download" disabled>下载结果</button><button type="button" class="ghost" id="converter-surge2clash-restore" disabled>恢复生成版本</button></div>
+              <small class="help">编辑结果不会自动执行或重新校验；输入与资源变化后保留旧草稿但不再标为有效。下载是本机文件，不代表部署验收。</small>
+            </details>
+          </details>
+          <details id="converterArchiveWorkspace"><summary>本机输入档案 · 导入 / 导出 JSON</summary>
+            <p class="warning">档案未加密，可能包含源链接、节点密码、上传文本、资源、外部配置、脚本和模板变量。请仅保存在可信本机位置，勿公开或上传公共服务。只保存输入，不包含生成结果、路由器状态或执行成功证明；已编辑结果请另行下载。</p>
+            <p class="help">仅支持 openclash-sync-converter / version=1，JSON 文件最多 8 MiB；每个任务仍需满足 1 MiB 输入预算。导入先严格校验，再询问是否替换当前输入及清除结果。不使用浏览器持久存储；不会自动发送、取源、运行脚本或复制内容。</p>
+            <label for="converterArchiveUpload">选择本机输入档案（JSON）</label><input id="converterArchiveUpload" type="file" accept=".json,application/json" disabled>
+            <div class="converter-actions"><button type="button" class="ghost" id="exportConverterArchive" disabled>导出本机输入档案</button></div>
+            <p id="converterArchiveState" class="validation idle" role="status" aria-live="polite">输入档案未导入。导出为未加密 JSON，不含生成结果或路由器状态。</p>
+          </details>
+          <section class="custom-section"><h3>从转换链接恢复参数</h3><label for="converterImport">已有 /sub 转换链接（只解析，不访问）</label><textarea id="converterImport" rows="3" autocomplete="off" spellcheck="false" disabled></textarea><button type="button" class="ghost" id="parseConverter" disabled>解析到表单</button></section>
+          <section class="custom-section"><h3>订阅链接结果</h3><label for="converterOutput">订阅链接（含源凭据，请勿公开）</label><textarea id="converterOutput" rows="4" readonly autocomplete="off" spellcheck="false"></textarea><div class="converter-actions"><button type="button" class="ghost" id="copyConverter" disabled>复制链接</button><button type="button" class="ghost" id="installConverter" disabled>导入本机 Clash</button></div><small class="help">导入会唤起本机客户端，由客户端访问所选后端；不会自动写入两个子网路由器。修改任何参数都会使旧结果失效。</small></section>
+        </section>
+
+        <section class="panel" id="editor" aria-labelledby="editorHeading">
+          <div class="panel-head"><div><p class="eyebrow">YAML（配置文件格式）编辑器</p><h2 id="editorHeading">浏览受管配置</h2><p>主配置可在读取后校验并保存；机场源文件仅供只读核对，请使用对应的受控更新操作。</p></div></div>
+          <p class="workflow-note" id="editorWorkflow"><strong>先读取，再保存</strong> 保存作用于所选子网和文件。读取获取摘要后再编辑、检查 YAML，并核对保存结果；文件写入不代表运行配置已更新。摘要不一致时先停止保存，重新读取并核对差异，不要用旧内容覆盖新文件。</p>
+          <div class="editor-toolbar">
+            <label for="editorTarget">目标子网<select id="editorTarget"><option value="router_a">路由器 A</option><option value="router_b">路由器 B</option></select></label>
+            <label for="fileName">配置文件<input id="fileName" value="ProviderBase-ProviderSource.yaml" placeholder="示例：ProviderBase.yaml" aria-describedby="editorFileHint"></label>
+            <button class="ghost" id="readConfig" aria-describedby="editorWorkflow">读取当前文件</button>
+          </div>
+          <small class="help field-hint" id="editorFileHint">仅支持受管文件名，机场源文件只读。切换目标或文件后，请重新读取。</small>
           <div class="editor-shell">
             <div class="line-numbers" id="lineNumbers" aria-hidden="true">1</div>
-            <textarea id="yamlEditor" spellcheck="false" aria-label="YAML 配置内容" placeholder="proxies:&#10;  - name: 示例节点&#10;    type: ss&#10;proxy-groups: []&#10;rules: []"></textarea>
+            <textarea id="yamlEditor" wrap="off" aria-describedby="editorLineHint" spellcheck="false" aria-label="YAML 配置内容" placeholder="proxies:&#10;  - name: 示例节点&#10;    type: ss&#10;proxy-groups: []&#10;rules: []"></textarea>
           </div>
-          <div class="validation-row"><span id="validationState" class="validation idle">等待输入</span><span id="cursorPosition">第 1 行，第 1 列</span><span id="fileHash">SHA-256：尚未读取</span></div>
-          <div class="editor-actions"><button class="ghost" id="validateYaml">检查 YAML 语法</button><button class="primary" id="saveConfig" disabled>校验并保存</button></div>
+          <small class="help" id="editorLineHint">长行保持原样，可横向滚动；行号按换行符计算。</small>
+          <div class="validation-row"><span id="validationState" class="validation idle" role="status" aria-live="polite">等待输入</span><span id="cursorPosition">第 1 行，第 1 列</span><span id="fileHash">SHA-256：尚未读取</span></div>
+          <div class="editor-actions action-footer" role="group" aria-label="检查与保存配置"><button class="ghost preview-action" id="validateYaml">检查 YAML 语法</button><button class="primary write-action" id="saveConfig" disabled aria-describedby="editorWorkflow validationState">校验并保存</button></div>
         </section>
 
-        <section class="panel" id="rollback">
-          <div class="panel-head"><div><p class="eyebrow danger-text">高风险操作</p><h2>回滚主配置文件</h2><p>恢复最近一个内容不同且通过校验的主配置备份。回滚前将再次备份当前文件并执行 Mihomo（OpenClash 核心）静态检查。</p></div></div>
-          <div class="warning"><strong>注意</strong><p>回滚只替换静态主配置并重放当前定制项；不会切换 ACTIVE（当前启用配置）、写入 UCI（OpenWrt 配置接口）或 reload（重新加载）运行内核。历史备份不会删除。</p></div>
-          <label class="field-label" for="rollbackTarget">目标路由器</label>
-          <select id="rollbackTarget"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select>
+        <section class="panel" id="rollback" aria-labelledby="rollbackHeading">
+          <div class="panel-head"><div><p class="eyebrow danger-text">高风险操作</p><h2 id="rollbackHeading">回滚主配置文件</h2><p>恢复最近一个内容不同且通过校验的主配置备份。回滚前将再次备份当前文件并执行 Mihomo（OpenClash 核心）静态检查。</p></div></div>
+          <div class="warning" id="rollbackImpact"><strong>写入静态文件，不等于运行态回退</strong><p>回滚只替换静态主配置并重放当前定制项；不会切换 ACTIVE（当前启用配置）、写入 UCI（OpenWrt 配置接口）或 reload（重新加载）运行内核。可信的新格式备份仍遵循七天保留策略。</p></div>
+          <label class="field-label" for="rollbackTarget">目标子网</label>
+          <select id="rollbackTarget" aria-describedby="rollbackImpact"><option value="router_a">路由器 A · 192.0.2.10</option><option value="router_b">路由器 B · 192.0.2.11</option></select>
           <label class="field-label" for="rollbackPhrase">确认短语</label>
-          <input id="rollbackPhrase" placeholder="请输入：确认回滚主配置" autocomplete="off">
-          <small class="help">输入必须完全一致，用于避免误触。</small>
-          <button class="danger" id="rollbackButton" disabled>回滚主配置</button>
+          <input id="rollbackPhrase" placeholder="请输入：确认回滚主配置" autocomplete="off" aria-describedby="rollbackPhraseHint rollbackImpact">
+          <small class="help" id="rollbackPhraseHint">输入必须完全一致，用于避免误触。先确认目标子网与上方影响，再执行回滚并核对返回结果；如果要回退的是运行态，或无法确认要恢复的备份，请不要继续。</small>
+          <button class="danger" id="rollbackButton" disabled aria-describedby="rollbackImpact rollbackPhraseHint">回滚主配置</button>
         </section>
       </div>
     </section>
   </main>
   <footer>OpenClash Publisher V4（发布器第四版） · 内网管理界面 · 不在浏览器保存订阅地址或配置内容</footer>
   <script src="/app.js" defer></script>
+  <script src="/converter.js" defer></script>
+  <script src="/converter_apply.js" defer></script>
+  <script src="/converter_services.js" defer></script>
 </body>
 </html>
