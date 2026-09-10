@@ -4,7 +4,7 @@
 
 ## 1. 状态与证据范围
 
-**2026-09-10：审计分支与附注标签已发布；初次 CI 暴露的 Linux 认证测试夹具问题已修复，生产认证逻辑不变。** 跟进源项目与公开副本独立 Web Python 全量各 905 项通过，公开必要本地离线门禁通过；真实 GUI 验收仍未完成。远端结果须读取对应提交的 CI，不能用本地通过覆盖；初次失败记录保留。部署比较、只读 HTTP、converter/native 和备份验收见第 7 节，不等于全部上线验收；发布身份见第 8 节。
+**2026-09-10：审计分支与附注标签已发布；Linux 认证夹具与可选 Mellow 跳过契约已在测试层修复，生产代码与严格门禁不变。** 最新源码 Web 905 项无 skip 通过；公开 CI 同配置根 72 项通过、Web run 905 / skip 13，整体 PASS_WITH_SKIPS；真实 GUI 验收仍未完成。远端结果须读取对应提交的 CI，不能用本地通过覆盖；初次及跟进失败记录保留。部署比较、只读 HTTP、converter/native 和备份验收见第 7 节，不等于全部上线验收；发布身份见第 8 节。
 
 每项结果只对应其受验代码、对象与时间；源项目与公开副本分别记录，不相加或互相替代。较早的全量、静态及渲染/runtime 构建仅作历史，最新结果在各节单列；此后输入变化仍须重验。依赖公告查询只覆盖固定依赖及查询时点，不扩大为全代码安全验收。生产 native 通过不改写本轮或较早离线日志中的 `NOT_RUN`，HTTP/native 结果不代替 GUI 或业务流量结论。原始输出及中间失败证据私有留存，公开摘要不包含工作区路径、真实设备标识、地址、凭据或生产摘要。
 
@@ -12,13 +12,13 @@
 | --- | --- | --- |
 | 8 份公开 Markdown 的最终结构、链接、术语与脱敏 | 以联合 QC / 交付回执为准 | 联合文档检查与最终文档全树扫描分别记录；不预先声明通过 |
 | 最终公开白名单、双层清单与 working/staged 门禁 | 以交付回执为准 | 对最终实际字节核对集合、摘要与授权范围；本地封版 ID 不在此预填 |
-| 源项目跟进 Web Python 全量 | PASS | `source-ci-fixture-full02`：905 项，151.493 秒；采集 151.680996 秒 / exit 0，无 skip、无超时，退出后进程组为空 |
-| 公开副本跟进 Web Python 全量 | PASS | `public-ci-fixture-full02`：905 项，154.125 秒；整套采集 158.369719 秒 / exit 0，无 skip、无超时，退出后进程组为空；不是借用源项目结果 |
+| 源项目跟进 Web Python 全量 | PASS | `source-mellow-contract-full01`：905 项，150.995 秒；采集 151.220790 秒 / exit 0，可选解析器已配置，无 skip、无超时，退出后进程组为空 |
+| 公开副本跟进 Web Python 全量 | PASS_WITH_SKIPS | `public-mellow-contract-full02`：run 905 / skip 13（未配置 Mellow），150.882 秒；整套采集 155.899656 秒 / exit 0，无超时、退出后进程组为空；不是借用源项目结果 |
 | 最新 smoke 专项 | PASS | 源项目 / 公开副本各 9/9，新增 4 项回归；与全量分开记录、不相加 |
-| 公开副本本地跟进全套及离线门禁 | PASS（本地） | 根 69 项，Lua agent/capture 147/14；五语言语法及必要本地离线门禁 PASS，LIVE_CHANGES=false；该入口 runtime-shape/native-parser probes 仍为 NOT_RUN |
+| 公开副本本地跟进全套及离线门禁 | PASS_WITH_SKIPS（本地） | 根 72 项，Lua agent/capture 147/14；Mihomo PASS、Mellow SKIP；五语言语法及必要门禁 PASS，LIVE_CHANGES=false；该入口 runtime-shape/native-parser probes 仍为 NOT_RUN |
 | 合成拓扑渲染及自动摘要重绑定 | PASS（本地合成） | `synthetic-render-final02`：77 个文件、根/Web 清单成员 75/37；不是生产 root 目录链验收 |
 | 本地 runtime 构建后独立验证 | PASS（本地合成） | `public-runtime-independent-final02`：31/31；12 文件与 manifest 合同，生产证据另列 |
-| 选择性静态正确性/安全门禁 | PASS_WITH_SKIPS | `public-security-final03`：静态 PASS；脚本内依赖查询 SKIP，15 MEDIUM 已审阅、254 LOW 保留 |
+| 选择性静态正确性/安全门禁 | PASS_WITH_SKIPS | `public-mellow-contract-security01`：静态 PASS；脚本内依赖查询 SKIP，HIGH 0、15 MEDIUM 已审阅、254 LOW 保留，未知/陈旧审阅均 0 |
 | 固定 Python 依赖公告查询 | PASS（独立查询） | `public-dependency-advisory-final01`：PyYAML 6.0.2 未发现已知漏洞；保留两条 warning，不扩展到系统/原生镜像 |
 | 隔离合成浏览器与视觉 | PASS（离线场景） | Chromium 43/43；主代理视觉复核 7 张截图，见第 6 节 |
 | macOS 真实系统外观切换 | PENDING | 尚未执行；最近交互尝试受 Mac 锁屏阻止，合成媒体查询测试不替代此项 |
@@ -95,6 +95,16 @@
 初次 Linux CI 的两个认证错误已在本机强制共享 TMPDIR 下精确复现。根因是测试使用默认临时目录，而生产 HA1 检查有意拒绝任一 group/world 可写祖先；macOS 默认临时目录掩盖了这一夹具假设。仅将两处合成夹具移入可信 checkout，新增直接父级及上层祖先分别为 `0720`、`0702`、`0777`、`01777` 的 8 个拒绝子案例，未改生产认证代码。checkout 也必须位于可信目录链；不要 chmod 系统 `/tmp`、跳过测试或弱化信任检查。
 
 修复后在共享 TMPDIR 下，源项目/公开副本定向各 86 项通过；独立全量各 905 项通过，最新时间与采集范围见第 1 节。公开全套另有根 Python 69、Lua agent 147、capture 14 及五语言语法 PASS。`public-ci-fixture-security01` 静态复验为 PASS_WITH_SKIPS：Ruff 与 ShellCheck 通过，Bandit HIGH 0 / 已审阅 MEDIUM 15 / LOW 254、未知及陈旧审阅均为 0；该入口依赖查询仍跳过。最初本地跟进因未刷清单失败、源项目首次跟进因私有测试沙箱未允许新夹具目录失败，均保留原始记录；分别修正清单与测试 profile 后重跑，不属于生产权限放宽。
+
+### 2026-09-10 Mellow 可选测试跳过契约修复
+
+[CI #15](https://github.com/sslkl/openclash-sync-guard/actions/runs/34466931345) 对应提交 `0d4527967efc8cd4cf67b91537ec0c7c83bfb173`：根 69 项通过，Web run 905 / skip 13、无断言失败，证明认证夹具修复有效。但三处可选 Mellow 跳过说明缺少环境变量标识，被严格聚合器按 `UNEXPECTED_SKIPS` 拒绝；该次后续独立 Mihomo 与静态安全步骤未执行。保留 failure，不把 Web 无断言失败写成 CI 成功。
+
+仅统一测试层 `requires_official_parser` 装饰器，未改生产程序、工作流或聚合器。只有未配置 `OPENCLASH_TEST_MELLOW_PARSER` 才能跳过；配置缺失/损坏文件或缺少 Node 必须失败。新增三项入口回归直接装载真实 13 项用例，先 RED（18 项、2 failures），修复后 18/18 GREEN。
+
+最新独立矩阵：源码配置解析器，905/905、无 skip；公开按 CI 环境不配置 Mellow，根 72/72、Web run 905 / skip 13，Mihomo PASS、整体 `PASS_WITH_SKIPS`。时间与静态复验见第 1 节；入口依赖查询仍 SKIP，之前独立公告查询不冒称本轮重跑。仅测试和文档改变，不需要重新部署。
+
+本地公开首轮曾因维护工具将路径字符串误作内容计算清单而被完整性测试拒绝。已改为读取文件字节，并由独立 Python 逐项核对后重新完整通过；清单成员集合与生产程序未改变，旧失败不删除。远端跟进结果必须以对应提交的 Actions 为准。
 
 ### 2026-09-10 格式边界修复
 
@@ -290,4 +300,4 @@ CGNAT fixture 变化曾使一条 B104 的精确上下文复核失效：静态入
 
 外部写入前仍须核对精确仓库、分支、可见性、文件范围和授权。初次只更新原公开项目的两个 refs，没有推送父工作区、强推、合并或改变 main。[初次 CI #13](https://github.com/sslkl/openclash-sync-guard/actions/runs/34447188599)在“Run complete offline regressions and five-language syntax checks”步骤 exit 1；该次后续 Mihomo synthetic Candidate 与静态安全步骤未执行。已读取错误栈，确认是 Linux 共享 TMPDIR 与严格祖先目录信任检查不兼容的测试夹具假设；修复与独立本地复验见第 3 节，不放宽生产安全要求。初次标签 CI #14 亦独立读回 failure，旧失败和旧标签保留。
 
-初次发布已完成 push/远端读回，PR/合并未执行。CI 夹具修复已实现；后续提交的远端结果须查看[对应 SHA 的 Actions](https://github.com/sslkl/openclash-sync-guard/actions?query=branch%3Acodex%2Faudit-ui-converter-release)，不能沿用初次标签或本地 PASS。真实 GUI/macOS 检查仍待完成，不声明全部发布验收通过。后续代码、文档或清单变化按影响范围重验；保留 write-check=SKIPPED、restore_drill=NOT_RUN、静态入口依赖跳过与各轮离线 probes 的 NOT_RUN，独立依赖查询按第 4 节单列。
+初次发布已完成 push/远端读回，PR/合并未执行。CI 认证夹具与 Mellow 可选跳过契约修复已实现；后续提交的远端结果须查看[对应 SHA 的 Actions](https://github.com/sslkl/openclash-sync-guard/actions?query=branch%3Acodex%2Faudit-ui-converter-release)，不能沿用初次标签或本地 PASS。真实 GUI/macOS 检查仍待完成，不声明全部发布验收通过。后续代码、文档或清单变化按影响范围重验；保留 write-check=SKIPPED、restore_drill=NOT_RUN、静态入口依赖跳过与各轮离线 probes 的 NOT_RUN，独立依赖查询按第 4 节单列。

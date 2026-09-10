@@ -179,6 +179,60 @@ class OfflineEntrypointTests(unittest.TestCase):
         self.assertIn("PYTHON_FIXTURE_TESTS_ERROR=UNEXPECTED_SKIPS", result.stdout)
         self.assertNotIn("HARNESS_COMPLETED", result.stdout)
 
+    @staticmethod
+    def mellow_fixture_files():
+        names = [
+            "test_converter_mellow.MellowOfficialParserTests",
+            "test_converter_format_regressions.MellowSourceRegressions."
+            "test_numeric_source_roundtrips_through_official_parser",
+            "test_converter_format_regressions.MellowUnicodeRegressions."
+            "test_escaped_json_names_and_passwords_roundtrip_official_parser",
+            "test_format_roundtrips.MellowSemanticRoundtrips."
+            "test_repaired_matrix_matches_cached_official_parser",
+        ]
+        return {"cases/test_mellow_contract.py": f"""
+            import sys
+            sys.path.insert(0, {str(ROOT / 'openclash-sync-web/tests')!r})
+            sys.path.insert(0, {str(ROOT / 'vendor/pyyaml-6.0.2')!r})
+            def load_tests(loader, tests, pattern):
+                return loader.loadTestsFromNames({names!r})
+        """}
+
+    def test_real_mellow_tests_share_unconfigured_parser_skip_contract(self):
+        result = self.run_fixture(self.mellow_fixture_files())
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("PYTHON_FIXTURE_TESTS_DISCOVERED=13", result.stdout)
+        self.assertIn("PYTHON_FIXTURE_TESTS_RUN=13", result.stdout)
+        self.assertIn("PYTHON_FIXTURE_TESTS_SKIPPED=13", result.stdout)
+        self.assertIn("PYTHON_FIXTURE_TESTS=PASS_WITH_SKIPS", result.stdout)
+        self.assertIn("HARNESS_SKIPPED=1", result.stdout)
+
+    def test_real_mellow_configured_missing_or_broken_parser_fails_without_skips(self):
+        for parser in ("missing-mellow.js", "broken-mellow.js"):
+            with self.subTest(parser=parser):
+                files = self.mellow_fixture_files()
+                files["broken-mellow.js"] = 'throw new Error("synthetic parser failure");\n'
+                result = self.run_fixture(
+                    files, environment={"OPENCLASH_TEST_MELLOW_PARSER": parser},
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("PYTHON_FIXTURE_TESTS_RUN=13", result.stdout)
+                self.assertIn("PYTHON_FIXTURE_TESTS_SKIPPED=0", result.stdout)
+                self.assertIn("PYTHON_FIXTURE_TESTS=FAIL", result.stdout)
+                self.assertNotIn("HARNESS_COMPLETED", result.stdout)
+
+    def test_real_mellow_configured_parser_requires_node_without_skips(self):
+        result = self.run_fixture(self.mellow_fixture_files(), environment={
+            "OPENCLASH_TEST_MELLOW_PARSER": "synthetic-mellow.js",
+            "PATH": "/nonexistent/synthetic-node-path",
+        })
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("PYTHON_FIXTURE_TESTS_RUN=13", result.stdout)
+        self.assertIn("PYTHON_FIXTURE_TESTS_SKIPPED=0", result.stdout)
+        self.assertIn("FileNotFoundError", result.stderr)
+        self.assertIn("PYTHON_FIXTURE_TESTS=FAIL", result.stdout)
+        self.assertNotIn("HARNESS_COMPLETED", result.stdout)
+
     def test_unconfigured_optional_parser_skip_is_reported(self):
         result = self.run_fixture({"cases/test_sample.py": """
             import unittest

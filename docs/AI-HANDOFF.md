@@ -105,6 +105,7 @@
 
 - 根目录两份 worker 类测试是直接执行型脚本，各自运行且各自检查退出码；不能当 unittest 模块导入，否则首个 `SystemExit(0)` 会漏跑后续测试。`tests/` 与 Web 使用 discovery，记录 discovered/run/skipped，并拒绝数量不一致或异常退出。新增入口回归见 `tests/test_offline_checks.py`。
 - 完整门禁覆盖 reconciler/worker 直接脚本、公开与 Web unittest、Ruby builder/customizer/chain、Lua agent/capture，以及显式配置的 Mihomo/Mellow 合成集成。当前各项数量、跳过项和时间只在验证记录中维护；wrapper 重复覆盖不累加，真实运行态/native probes 另行验收。
+- Mellow 可选测试必须共用 `test_converter_mellow.requires_official_parser`。仅未配置 `OPENCLASH_TEST_MELLOW_PARSER` 可跳过，原因必须保留变量标识，供严格聚合器识别；已配置但缺失/损坏的解析器或缺少 Node 必须失败，不得再用 `shutil.which` 转成 skip。`tests/test_offline_checks.py` 直接装载真实 13 项用例，分别覆盖未配置、文件错误及缺 Node；不能放宽聚合器或工作流来凑绿。CI #15 的失败与本地两种依赖矩阵见验证记录。
 - 语法检查用编译/AST 或 `--check`、`-c`、`-n` 等不执行安装动作的入口。不得把生产 smoke/acceptance CLI 当普通回归运行；import 纯校验函数也不代表访问过生产。
 - 浏览器合成测试使用隔离 profile、合成 API/认证及受控离线资源，明确真实后端/外网是否参与。桌面、手机、低高度、键盘、焦点、长输入和错误状态分别复核。
 - GUI 截图、HTTP/native、runtime 与真实业务端到端属于不同证据。没有已认证真实会话就标 `NOT RUN`，不复制凭据补齐指标。

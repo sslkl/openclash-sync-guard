@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import unittest
@@ -366,8 +365,13 @@ class MellowValidationTests(unittest.TestCase):
 PARSER = os.environ.get('OPENCLASH_TEST_MELLOW_PARSER', '')
 
 
-@unittest.skipUnless(PARSER and shutil.which('node'),
-                     'set OPENCLASH_TEST_MELLOW_PARSER to official Mellow src/config/convert.js')
+# Skip only unconfigured integration; a broken parser or missing Node must fail.
+requires_official_parser = unittest.skipUnless(
+    PARSER, 'OPENCLASH_TEST_MELLOW_PARSER is not configured',
+)
+
+
+@requires_official_parser
 class MellowOfficialParserTests(unittest.TestCase):
     """The real parser, including INI sections and routing, not a URL approximation."""
     def parse_config(self, content):

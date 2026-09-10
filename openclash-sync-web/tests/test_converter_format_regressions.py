@@ -3,7 +3,6 @@ import base64
 import json
 import math
 from pathlib import Path
-import shutil
 import sys
 import unittest
 from unittest.mock import patch
@@ -87,8 +86,7 @@ class MellowSourceRegressions(unittest.TestCase):
         self.assertEqual(node['h2-opts'], {'host': ['one.test', 'two.test'], 'path': '/relay'})
         mellow.validate(mellow_fixture.config(node))
 
-    @unittest.skipUnless(mellow_fixture.PARSER and shutil.which('node'),
-                         'requires captured official Mellow parser and Node')
+    @mellow_fixture.requires_official_parser
     def test_numeric_source_roundtrips_through_official_parser(self):
         node = self.numeric_node()
         parsed = mellow_fixture.MellowOfficialParserTests().parse_config(mellow_fixture.config(node))
@@ -191,8 +189,7 @@ class MellowUnicodeRegressions(unittest.TestCase):
         self.assertIn('Proxy, ' + node['name'] + ':Synthetic-VMess,', repaired)
         mellow.validate(repaired)
 
-    @unittest.skipUnless(mellow_fixture.PARSER and shutil.which('node'),
-                         'requires captured official Mellow parser and Node')
+    @mellow_fixture.requires_official_parser
     def test_escaped_json_names_and_passwords_roundtrip_official_parser(self):
         node, repaired = self.repaired()
         parsed = mellow_fixture.MellowOfficialParserTests().parse_config(repaired)

@@ -4,7 +4,6 @@ import copy
 import json
 import math
 from pathlib import Path
-import shutil
 import sys
 import tomllib
 import unittest
@@ -275,8 +274,7 @@ class MellowSemanticRoundtrips(unittest.TestCase):
                     native, repaired = mellow_repair_pair([expected])
                     self.assertEqual(mellow.repair(native, formats.dump({'proxies': [expected]}, 'yaml')), repaired)
 
-    @unittest.skipUnless(mellow_fixture.PARSER and shutil.which('node'),
-                         'requires captured official Mellow parser and Node')
+    @mellow_fixture.requires_official_parser
     def test_repaired_matrix_matches_cached_official_parser(self):
         nodes = supported_nodes()
         native, _ = mellow_repair_pair(nodes)
