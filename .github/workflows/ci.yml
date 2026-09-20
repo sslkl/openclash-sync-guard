@@ -25,7 +25,7 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: openclash-sync-web/requirements.txt
-      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1 (2026-07-22)
+      - uses: ruby/setup-ruby@a0102e0972be65f351c307e2d64b9314a57c8073 # v1 (2026-07-22)
         with:
           ruby-version: '3.3'
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
